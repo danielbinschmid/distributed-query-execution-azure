@@ -31,6 +31,12 @@ void AzureBlobClient::createContainer(std::string containerName)
    this->containerName = std::move(containerName);
 }
 
+void AzureBlobClient::setContainer(std::string containerName)
+// Create a container that stores all blobs
+{  
+   this->containerName = std::move(containerName);
+}
+
 void AzureBlobClient::deleteContainer()
 // Delete the container that stored all blobs
 {
@@ -63,7 +69,6 @@ std::vector<std::string> AzureBlobClient::listBlobs()
 {
    std::vector<std::string> results;
    std::string continuationToken;
-
    do {
       auto blobs = client.list_blobs_segmented(containerName, "/", continuationToken, "").get();
       if (!blobs.success())

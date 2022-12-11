@@ -29,6 +29,7 @@ class AzureBlobClient {
    /// Create a container that stores all blobs
    void createContainer(std::string containerName);
    
+   void setContainer(std::string containerName);
    /// Delete the container that stored all blobs
    void deleteContainer();
 

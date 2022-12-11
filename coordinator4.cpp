@@ -20,16 +20,8 @@ int main(int argc, char* argv[]) {
    auto blobClient = AzureBlobClient(accountName, accountToken);
 
    std::cerr << "Creating Azure blob container" << std::endl;
-   // blobClient.createContainer("cbdp-assignment7");
-   blobClient.setContainer("urls");
-   auto blobs = blobClient.listBlobs();
-   std::cout << "nBlobs: " << blobs.size() <<std::endl;
-   for (const auto& blob: blobs) {
-      std::cout << blob << std::endl;
-   }
-   /**
-    * 
-   
+   blobClient.createContainer("cbdp-assignment4");
+
    std::cerr << "Uploading a blob" << std::endl;
    {
       std::stringstream upload;
@@ -42,10 +34,8 @@ int main(int argc, char* argv[]) {
 
    std::cerr << "Recieved: " << downloaded.view() << std::endl;
 
-   auto v = blobClient.listBlobs();
-   std::cout << "here: " << v.size() << std::endl;
    std::cerr << "Deleting the container" << std::endl;
    blobClient.deleteContainer();
-   */
+
    return 0;
 }
