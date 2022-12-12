@@ -36,6 +36,7 @@ class AzureBlobClient {
    /// Write a string stream to a blob
    void uploadStringStream(const std::string& blobName, std::stringstream& stream);
 
+   void test();
    /// Read a string stream from a blob
    std::stringstream downloadStringStream(const std::string& blobName);
 
