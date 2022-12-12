@@ -41,12 +41,12 @@ size_t processUrl(CurlEasyPtr& curl, std::string_view url) {
    milliseconds downloadStartTime = duration_cast< milliseconds >(
       system_clock::now().time_since_epoch()
    );
-   std::string filename = fs::path(std::string(url)).filename();
-   std::string filepath = "files/" + filename;
-   curl.easyInit();
-   // auto csvData = getCsvHTTP(curl, std::string(url));
-   std::fstream csvData;
-   csvData.open(filepath);
+   // std::string filename = fs::path(std::string(url)).filename();
+   //std::string filepath = "files/" + filename;
+   // curl.easyInit();
+   auto csvData = getCsvHTTP(curl, std::string(url));
+   // std::fstream csvData;
+   // csvData.open(filepath);
    
    getTimeSinceStart(downloadStartTime, "time needed to download csv: ");
 
