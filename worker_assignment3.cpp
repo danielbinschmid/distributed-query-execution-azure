@@ -8,6 +8,8 @@
 #include <sys/socket.h>
 #include <filesystem>
 #include <fstream>
+#include "AzureBlobClient.h"
+#include "credentials.h"
 namespace fs = std::filesystem;
 /**
  * 
@@ -41,16 +43,23 @@ size_t processUrl(CurlEasyPtr& curl, std::string_view url) {
    milliseconds downloadStartTime = duration_cast< milliseconds >(
       system_clock::now().time_since_epoch()
    );
-   // std::string filename = fs::path(std::string(url)).filename();
-   //std::string filepath = "files/" + filename;
-   // curl.easyInit();
-   auto csvData = getCsvHTTP(curl, std::string(url));
+   std::string filename = fs::path(std::string(url)).filename();
+   std::string filepath = "files/" + filename;
+   curl.easyInit();
+   // auto csvData = getCsvHTTP(curl, std::string(url));
    // std::fstream csvData;
    // csvData.open(filepath);
-   
+   static const std::string accountName = credentials::accountName;
+   static const std::string accountToken = credentials::accountToken;
+   auto blobClient = AzureBlobClient(accountName, accountToken);
+   blobClient.setContainer("urls");
+
+   auto content = blobClient.downloadStringStream(filepath);
+
+
    getTimeSinceStart(downloadStartTime, "time needed to download csv: ");
 
-   for (std::string row; std::getline(csvData, row, '\n');) {
+   for (std::string row; std::getline(content, row, '\n');) {
       auto rowStream = std::stringstream(std::move(row));
 
       // Check the URL in the second column

@@ -17,7 +17,15 @@
 #include "blob/blob_client.h"
 
 #include <stdlib.h>
-#include <iostream>
+#include "AzureBlobClient.h"
+#include "credentials.h"
+
+
+// Your settings
+
+
+// ...
+
 using namespace std::chrono;
 
 
@@ -80,7 +88,7 @@ milliseconds getTimeSinceStart(milliseconds startTime, std::string message) {
    return downloadedTime;
 }
 
-void getFilesTodoHttp(char* pathToCsv,  std::vector<std::string> &todoOutput) {
+void getFilesTodoHttp(char* pathToCsv,  std::vector<std::string> todoOutput) {
    auto curlSetup = CurlGlobalSetup();
 
    auto listUrl = std::string(pathToCsv);
@@ -90,9 +98,8 @@ void getFilesTodoHttp(char* pathToCsv,  std::vector<std::string> &todoOutput) {
    curl.setUrl(listUrl);
    auto fileList = curl.performToStringStream();
 
-   for (std::string url; std::getline(fileList, url, '\n');) {  
+   for (std::string url; std::getline(fileList, url, '\n');)
       todoOutput.push_back(std::move(url));
-   }
 }
 
 void getFilesTodo(char* pathToCsv, std::vector<std::string> &todoOutput) {
@@ -115,6 +122,20 @@ void getFilesTodo(char* pathToCsv, std::vector<std::string> &todoOutput) {
 }
 
 
+void getFilesTodoAzure(char* filename, std::vector<std::string> &todoOutput) {
+   static const std::string accountName = credentials::accountName;
+   static const std::string accountToken = credentials::accountToken;
+   auto blobClient = AzureBlobClient(accountName, accountToken);
+   blobClient.setContainer("urls");
+   std::string filelistLocation = "files/" + std::string(filename);
+   auto content = blobClient.downloadStringStream(filelistLocation);
+
+   for (std::string url; std::getline(content, url, '\n');) {
+      todoOutput.push_back(std::move(url));
+   }
+      
+}  
+
 
 /// Leader process that coordinates workers. Workers connect on the specified port
 /// and the coordinator distributes the work of the CSV file list.
@@ -133,9 +154,9 @@ int main(int argc, char* argv[]) {
 
    std::vector<std::string> filesTodo;
    filesTodo.reserve(100);
-   getFilesTodoHttp(argv[1], filesTodo);
+   getFilesTodoAzure(argv[1], filesTodo); // getFilesTodo(argv[1], filesTodo); // getFilesTodoHttp(argv[1], filesTodo);
    
-
+   std::cout << filesTodo[0] << std::endl;
    milliseconds downloadedTime = getTimeSinceStart(coordinatorStartTime, "Downloaded after ");
 
    // Listen
