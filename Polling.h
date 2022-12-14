@@ -29,13 +29,13 @@ class Polling {
 
 class InitialCounting: public Polling {
     private:
-        size_t result;
+        
         std::unordered_map<int, std::string> distributedWork;
         std::vector<std::string> initialPartitions;
 
 
     public:
-
+        size_t result;
         void init(int listener, std::vector<std::string> initialPartitions);
 
         void pollLoop();
