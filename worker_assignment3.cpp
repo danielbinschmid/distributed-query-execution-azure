@@ -9,10 +9,30 @@
 #include <filesystem>
 #include <fstream>
 #include "AzureBlobClient.h"
-#include "config.h"
-
+#include "credentials.h"
 namespace fs = std::filesystem;
+/**
+ * 
+*/
+#include <chrono>
 
+using namespace std::chrono;
+
+milliseconds getTimeSinceStart(milliseconds startTime, std::string message) {
+   milliseconds downloadedTime = duration_cast< milliseconds >(
+      system_clock::now().time_since_epoch()
+   );
+   std::cout << message << (double) (downloadedTime.count() - startTime.count()) / 1000.0 << " seconds" << std::endl;
+
+   return downloadedTime;
+}
+
+std::stringstream getCsvHTTP(CurlEasyPtr& curl, std::string url) {
+   curl.setUrl(url);
+   auto csvData = curl.performToStringStream();
+
+   return csvData;
+}
 
 
 size_t processUrl(CurlEasyPtr& curl, std::string_view url) {
@@ -20,14 +40,25 @@ size_t processUrl(CurlEasyPtr& curl, std::string_view url) {
    size_t result = 0;
    // Download the file
 
+   milliseconds downloadStartTime = duration_cast< milliseconds >(
+      system_clock::now().time_since_epoch()
+   );
    std::string filename = fs::path(std::string(url)).filename();
    std::string filepath = "files/" + filename;
    curl.easyInit();
    // auto csvData = getCsvHTTP(curl, std::string(url));
-   std::fstream content;
-   content.open(filepath);
+   // std::fstream csvData;
+   // csvData.open(filepath);
+   static const std::string accountName = credentials::accountName;
+   static const std::string accountToken = credentials::accountToken;
+   auto blobClient = AzureBlobClient(accountName, accountToken);
+   blobClient.setContainer("urls");
 
-   
+   auto content = blobClient.downloadStringStream(filepath);
+
+
+   getTimeSinceStart(downloadStartTime, "time needed to download csv: ");
+
    for (std::string row; std::getline(content, row, '\n');) {
       auto rowStream = std::stringstream(std::move(row));
 
@@ -37,9 +68,6 @@ size_t processUrl(CurlEasyPtr& curl, std::string_view url) {
          // column 0 is id, 1 is URL
          if (columnIndex == 1) {
             // Check if URL is "google.ru"
-
-            // TODO: replace with counting the URLs
-
             auto pos = column.find("://"sv);
             if (pos != std::string::npos) {
                auto afterProtocol = std::string_view(column).substr(pos + 3);

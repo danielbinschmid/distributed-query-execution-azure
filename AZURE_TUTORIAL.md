@@ -57,7 +57,6 @@ https://learn.microsoft.com/en-us/training/modules/intro-to-containers/6-deploy-
 az login
 
 # Create a "resource group" that bundles your setup
-az group create --name cbdp-resourcegroup --location westeurope
 # Create a container registry for your coordinator/worker containers
 # You need a unique name for your registry, try choosing your group name
 REGISTRY_NAME="cbdpgroup999"

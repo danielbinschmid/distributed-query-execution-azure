@@ -1,41 +1,67 @@
-#include "AzureBlobClient.h"
+#include "CurlEasyPtr.h"
+#include <array>
+#include <charconv>
 #include <iostream>
+#include <sstream>
 #include <string>
+#include <unordered_map>
+#include <vector>
+#include <netdb.h>
+#include <sys/poll.h>
+#include <unistd.h>
+#include <chrono>
+#include <fstream>
+#include <stdlib.h>
+#include "storage_credential.h"
+#include "storage_account.h"
+#include "blob/blob_client.h"
 
-/// Leader process that coordinates workers. Workers connect on the specified port
-/// and the coordinator distributes the work of the CSV file list.
-/// Example:
-///    ./coordinator http://example.org/filelist.csv 4242
+
+#include "AzureBlobClient.h"
+#include "config.h"
+#include "tools.h"
+#include "HashRanging.h"
+#include "config.h"
+#include "Polling.h"
+
+/**
+ * Leader process that coordinates workers. 
+ * 
+ * Workers connect on the specified port
+ * and the coordinator distributes the work of the CSV file list
+ * Example:
+ *    ./coordinator http://example.org/filelist.csv 4242 
+*/
 int main(int argc, char* argv[]) {
    if (argc != 3) {
       std::cerr << "Usage: " << argv[0] << " <URL to csv list> <listen port>" << std::endl;
       return 1;
-   }
+   }  
+   // ---------------------- STRATEGY --------------------------
+   // First, do the initial work, i.e. computing aggregates. Apply the same elasticity system as in assignment 3. 
+   // Compute hash values for domains. Then split in ranges with pre-specified number of ranges.  
 
-   // TODO: add your azure credentials, get them via:
-   // az storage account list
-   // az account get-access-token --resource https://storage.azure.com/ -o tsv --query accessToken
-   static const std::string accountName = "YOUR_STORAGE_ACCOUNT";
-   static const std::string accountToken = "XXX";
-   auto blobClient = AzureBlobClient(accountName, accountToken);
+   // Second, after the initial work is done, use workers again to merge and sort ranges.
 
-   std::cerr << "Creating Azure blob container" << std::endl;
-   blobClient.createContainer("cbdp-assignment4");
+   // After each range is sorted and merged, merge the top25 aggregates in the coordinator
+   // ----------------------------------------------------------   
 
-   std::cerr << "Uploading a blob" << std::endl;
-   {
-      std::stringstream upload;
-      upload << "Hello World!" << std::endl;
-      blobClient.uploadStringStream("hello", upload);
-   }
+   std::vector<std::string> initialPartition;
+   initialPartition.reserve(100);
+   tools::coordinator::getInitialPartitionsLocalFiles(argv[1], initialPartition);
 
-   std::cerr << "Downloading the blob again" << std::endl;
-   auto downloaded = blobClient.downloadStringStream("hello");
+   auto listener = tools::coordinator::getListenerSocket(argv[2]);
 
-   std::cerr << "Recieved: " << downloaded.view() << std::endl;
 
-   std::cerr << "Deleting the container" << std::endl;
-   blobClient.deleteContainer();
+   PollLoops polling;
+   polling.init(listener, initialPartition);
+
+   polling.pollLoop();
+
+   std::cout << polling.result << std::endl;
+
+   polling.closePolling();
+
 
    return 0;
 }

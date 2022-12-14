@@ -31,6 +31,34 @@ void AzureBlobClient::createContainer(std::string containerName)
    this->containerName = std::move(containerName);
 }
 
+void AzureBlobClient::setContainer(std::string containerName)
+// Create a container that stores all blobs
+{  
+   this->containerName = std::move(containerName);
+
+}
+
+
+void AzureBlobClient::test() {
+   auto blobs = this->listBlobs();
+   std::cout << "nBlobs: " << blobs.size() <<std::endl;
+   for (const auto& blob: blobs) {
+      auto li = client.get_block_list(this->containerName, blob);
+      li.wait();
+      auto outcome = li.get().response();
+
+
+      auto blobProps = client.get_blob_properties(this->containerName, blob);
+      blobProps.wait();
+      auto ou = blobProps.get();
+      auto now = ou.response();
+      //now.
+   
+   }
+
+}
+
+
 void AzureBlobClient::deleteContainer()
 // Delete the container that stored all blobs
 {
@@ -63,7 +91,6 @@ std::vector<std::string> AzureBlobClient::listBlobs()
 {
    std::vector<std::string> results;
    std::string continuationToken;
-
    do {
       auto blobs = client.list_blobs_segmented(containerName, "/", continuationToken, "").get();
       if (!blobs.success())
