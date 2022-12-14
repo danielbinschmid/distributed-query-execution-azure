@@ -15,7 +15,7 @@ class Polling {
         
             // The class
     protected:             // Access specifier
-        int myNum;        // Attribute (int variable)
+
 
         void initPolling(int listener);
 
@@ -23,8 +23,11 @@ class Polling {
          * 
          * @param incomingConnectionCallback - called when a new connection is established. Takes pollFd as argument.
          * @param recvBytes - called when bytes with numBytes != 0 are received. Takes (pollFd, numBytes, bytesReceivedBuffer) as arguments. 
-         * Returns true if bytes received are valid and false and bytes received are invalid.
          * @param workerFailureCallback - called when a worker failed. 
+         * 
+         * Skips to next pollFd when a callback yields CONTINUE_INNER_LOOP.
+         * Terminates immediately if a callback yields BREAK_OUTER_LOOP.
+         * Follows default path if a callback yields DEFAULT_.
         */
         void pollIteration(
                     std::function<CallbackReturn(int)> incomingConnectionCallback, 
