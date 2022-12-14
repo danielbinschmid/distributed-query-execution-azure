@@ -13,13 +13,15 @@ add_executable(coordinator
         coordinator.cpp
         CurlEasyPtr.cpp
         AzureBlobClient.cpp AzureBlobClient.h
-        HashRanging.cpp HashRanging.h)
+        HashRanging.cpp HashRanging.h
+        tools.cpp tools.h)
 target_link_libraries(coordinator PUBLIC CURL::libcurl azure-storage-lite)
 
 add_executable(worker
         worker.cpp
         CurlEasyPtr.cpp
         AzureBlobClient.cpp AzureBlobClient.h
-        HashRanging.cpp HashRanging.h)
+        HashRanging.cpp HashRanging.h
+        tools.cpp tools.h)
 target_link_libraries(worker PUBLIC CURL::libcurl azure-storage-lite)
 

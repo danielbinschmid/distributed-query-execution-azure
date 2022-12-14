@@ -1,4 +1,5 @@
-
+#include <vector>
+#include <string>
 
 namespace tools {
     namespace coordinator {
@@ -9,6 +10,6 @@ namespace tools {
 
         void getInitialPartitionsLocalFiles(char* pathToCsv, std::vector<std::string> &todoOutput);
 
-        void getInitialPartitionsHttp(char* pathToCsv,  std::vector<std::string> todoOutput);
+        void getInitialPartitionsHttp(char* pathToCsv,  std::vector<std::string> &todoOutput);
     } 
 }

@@ -58,7 +58,9 @@ int tools::coordinator::getListenerSocket(char* port) {
 
 
 void tools::coordinator::getInitialPartitionsAzure(char* pathToCsv,  std::vector<std::string> &todoOutput) {
-
+    pathToCsv[0] = '\0';
+    todoOutput.at(0);
+    std::cerr << "not implemented" << std::endl;
 }
 
 void tools::coordinator::getInitialPartitionsLocalFiles(char* pathToCsv, std::vector<std::string> &todoOutput) {
@@ -78,5 +80,7 @@ void tools::coordinator::getInitialPartitionsLocalFiles(char* pathToCsv, std::ve
 }
 
 void tools::coordinator::getInitialPartitionsHttp(char* pathToCsv, std::vector<std::string> &todoOutput) {
-
+    pathToCsv[0] = '\0';
+    todoOutput.at(0);
+    std::cerr << "not implemented" << std::endl;
 }
