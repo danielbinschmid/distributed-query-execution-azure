@@ -53,12 +53,14 @@ int main(int argc, char* argv[]) {
    auto listener = tools::coordinator::getListenerSocket(argv[2]);
 
 
-   InitialCounting polling;
+   PollLoops polling;
    polling.init(listener, initialPartition);
 
    polling.pollLoop();
 
    std::cout << polling.result << std::endl;
+
+   polling.closePolling();
 
 
    return 0;

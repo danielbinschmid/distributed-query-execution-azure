@@ -19,9 +19,9 @@ void Polling::initPolling(int listener) {
 
 
 void Polling::pollIteration(
-                    std::function<void(int)> incomingConnectionCallback, 
-                    std::function<int(int, int, std::array<char, 32>)> recvBytes, 
-                    std::function<void(int)> workerFailureCallback) {
+                    std::function<CallbackReturn(int)> incomingConnectionCallback, 
+                    std::function<CallbackReturn(int, int, std::array<char, 32>)> recvBytes, 
+                    std::function<CallbackReturn(int)> workerFailureCallback) {
     poll(pollFds.data(), pollFds.size(), -1);
 
     for (size_t index = 0, limit = pollFds.size(); index != limit; ++index) {
@@ -45,7 +45,8 @@ void Polling::pollIteration(
             });
 
             // And directly assign some work
-            incomingConnectionCallback(newConnection);
+            CallbackReturn callRet = incomingConnectionCallback(newConnection);
+            if (callRet == CallbackReturn::BREAK_OUTER_LOOP) return;
             continue;
         }
 
@@ -66,7 +67,8 @@ void Polling::pollIteration(
             --limit;
             continue;
         }
-        if (!recvBytes(pollFd.fd, (int) numBytes, buffer)) {
+        CallbackReturn recvReturn = recvBytes(pollFd.fd, (int) numBytes, buffer);
+        if (recvReturn == CallbackReturn::CONTINUE_INNER_LOOP) {
             close(pollFd.fd); // Bye!
 
             std::swap(pollFds[index], pollFds.back());
@@ -74,6 +76,8 @@ void Polling::pollIteration(
             --index;
             --limit;
             continue;
+        } else if(recvReturn == CallbackReturn::BREAK_OUTER_LOOP) {
+            return;
         }
 
 
@@ -88,7 +92,7 @@ void Polling::closePolling() {
 }
 
 
-void InitialCounting::init(int listener, std::vector<std::string> initialPartitions) {
+void PollLoops::init(int listener, std::vector<std::string> initialPartitions) {
     this->result = 0;
 
     this->distributedWork = std::unordered_map<int, std::string>();
@@ -98,15 +102,12 @@ void InitialCounting::init(int listener, std::vector<std::string> initialPartiti
 
 
 
-void InitialCounting::pollLoop() {
+void PollLoops::pollLoop() {
 
-    bool finished = false;
 
-    auto incomingConnectionCallback2 = [&](int fd) {
-        if (initialPartitions.empty())  {
-            finished = true;
-            return;
-        }
+    auto assignWork = [&](int fd) {
+        if (initialPartitions.empty())  
+            return CallbackReturn::BREAK_OUTER_LOOP;
         distributedWork[fd] = std::move(initialPartitions.back());
         initialPartitions.pop_back();
 
@@ -114,10 +115,10 @@ void InitialCounting::pollLoop() {
         if (auto status = send(fd, file.c_str(), file.size(), 0); status == -1) {
             perror("send() failed");
             
-
             initialPartitions.push_back(std::move(distributedWork[fd]));
             distributedWork.erase(fd);
         }
+        return CallbackReturn::DEFAULT_;
     };
 
     auto workerFailureCallback = [&](int pollFd) {
@@ -125,33 +126,36 @@ void InitialCounting::pollLoop() {
             initialPartitions.push_back(std::move(distributedWork[pollFd]));
             distributedWork.erase(pollFd);
         }
+        return CallbackReturn::DEFAULT_;
     };
     
 
-    auto recvBytes2 = [&](int pollFd, int numBytes, std::array<char, 32> buffer) {
+    auto recvBytes = [&](int pollFd, int numBytes, std::array<char, 32> buffer) {
         // Parse response
         auto response = std::string_view(buffer.data(), static_cast<size_t>(numBytes));
         size_t clientResult = 0;
         auto [_, ec] = std::from_chars(response.data(), response.data() + response.size(), clientResult);
         if (ec != std::errc()) {
             workerFailureCallback(pollFd);
-            return 0;
+            return CallbackReturn::CONTINUE_INNER_LOOP;
         }
 
         // Result ok
         result += clientResult;
         distributedWork.erase(pollFd);
 
-        // Assign more work
-        incomingConnectionCallback2(pollFd);
-        return 1;
+        return assignWork(pollFd);
     };
 
 
     
-    while(!initialPartitions.empty() || !distributedWork.empty()) {
-        this->pollIteration(incomingConnectionCallback2, recvBytes2, workerFailureCallback);
+    while(!initialPartitions.empty() || !distributedWork.empty())
+        this->pollIteration(assignWork, recvBytes, workerFailureCallback);
+    
+}
 
-        if (finished) return;
-    }
+
+
+void PollLoops::countLoop() {
+
 }
