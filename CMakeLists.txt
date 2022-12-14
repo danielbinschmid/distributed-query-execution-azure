@@ -14,7 +14,8 @@ add_executable(coordinator
         CurlEasyPtr.cpp
         AzureBlobClient.cpp AzureBlobClient.h
         HashRanging.cpp HashRanging.h
-        tools.cpp tools.h)
+        tools.cpp tools.h
+        Polling.cpp Polling.h)
 target_link_libraries(coordinator PUBLIC CURL::libcurl azure-storage-lite)
 
 add_executable(worker
@@ -22,6 +23,7 @@ add_executable(worker
         CurlEasyPtr.cpp
         AzureBlobClient.cpp AzureBlobClient.h
         HashRanging.cpp HashRanging.h
-        tools.cpp tools.h)
+        tools.cpp tools.h
+        Polling.cpp Polling.h)
 target_link_libraries(worker PUBLIC CURL::libcurl azure-storage-lite)
 

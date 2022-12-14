@@ -39,7 +39,7 @@ size_t processUrl(CurlEasyPtr& curl, std::string_view url) {
             // Check if URL is "google.ru"
 
             // TODO: replace with counting the URLs
-            
+
             auto pos = column.find("://"sv);
             if (pos != std::string::npos) {
                auto afterProtocol = std::string_view(column).substr(pos + 3);

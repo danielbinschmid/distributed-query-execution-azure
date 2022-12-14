@@ -11,12 +11,12 @@
 #include <unistd.h>
 #include <chrono>
 #include <fstream>
-
+#include <stdlib.h>
 #include "storage_credential.h"
 #include "storage_account.h"
 #include "blob/blob_client.h"
 
-#include <stdlib.h>
+
 #include "AzureBlobClient.h"
 #include "config.h"
 #include "tools.h"
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
    std::vector<std::string> initialPartition;
    initialPartition.reserve(100);
    tools::coordinator::getInitialPartitionsLocalFiles(argv[1], initialPartition);
-   
+
    auto listener = tools::coordinator::getListenerSocket(argv[2]);
 
    // Setup polling for new connections and worker responses
