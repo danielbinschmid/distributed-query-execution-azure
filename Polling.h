@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <functional>
 #include <string>
-
+#include "tools.h"
 enum CallbackReturn { BREAK_OUTER_LOOP, CONTINUE_INNER_LOOP, DEFAULT_ };
 
 
@@ -52,6 +52,20 @@ class PollLoops: public Polling {
 
         void pollLoop();
 
+};
+
+
+
+class CountLoop: public Polling {
+    private:
+        std::vector<CountPartitionTask> initialPartitions;
+
+        std::unordered_map<int, CountPartitionTask> distributedWork;
+
+
+    public:
+        int result;
+        void init(int listener, std::vector<std::string> initialPartitions);
 
         void countLoop();
 };

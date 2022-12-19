@@ -10,20 +10,21 @@
 #include <fstream>
 #include "AzureBlobClient.h"
 #include "config.h"
+#include "tools.h"
+#define N_BYTES_RECEIVED 1024
 
 namespace fs = std::filesystem;
 
 
 
-size_t processUrl(CurlEasyPtr& curl, std::string_view url) {
+size_t processUrl(std::string_view url) {
    using namespace std::literals;
    size_t result = 0;
    // Download the file
 
    std::string filename = fs::path(std::string(url)).filename();
    std::string filepath = "files/" + filename;
-   curl.easyInit();
-   // auto csvData = getCsvHTTP(curl, std::string(url));
+
    std::fstream content;
    content.open(filepath);
 
@@ -63,6 +64,8 @@ int main(int argc, char* argv[]) {
       return 1;
    }
    std::cout << "Start worker" << std::endl;
+
+   // ------------------------------- CONNECT TO COORDINATOR ---------------------------------
    // Set up the connection
    addrinfo hints = {};
    hints.ai_family = AF_UNSPEC;
@@ -89,6 +92,9 @@ int main(int argc, char* argv[]) {
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
    }
+   // ------------------------------------------------------------------------------------------
+
+
 breakConnect:
    freeaddrinfo(coordinatorAddr);
    if (status == -1) {
@@ -97,18 +103,27 @@ breakConnect:
    }
 
    // Connected
-   auto curlSetup = CurlGlobalSetup();
-   auto curl = CurlEasyPtr::easyInit();
-   auto buffer = std::array<char, 1024>();
+   auto buffer = std::array<char, N_BYTES_RECEIVED>();
    while (true) {
       auto numBytes = recv(connection, buffer.data(), buffer.size(), 0);
       if (numBytes <= 0) {
          // connection closed / error
          break;
       }
-      auto url = std::string_view(buffer.data(), static_cast<size_t>(numBytes));
-      auto result = processUrl(curl, url);
 
+
+      auto taskSerialized = std::string(buffer.data(), static_cast<size_t>(numBytes));
+      
+      CountPartitionTask task;
+      tools::worker::deserializeCountPartitionTask(taskSerialized, task);
+
+      OccurencesMap occurrencesMap;
+      tools::worker::getOccurencesMap(task.url, occurrencesMap);
+
+      tools::worker::storeOccurencesMapToDisk(task.partitionIdx, occurrencesMap);
+
+      
+      auto result = 1;
       auto response = std::to_string(result);
       if (send(connection, response.c_str(), response.size(), 0) == -1) {
          perror("send() failed");

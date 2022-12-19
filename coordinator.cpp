@@ -52,7 +52,9 @@ int main(int argc, char* argv[]) {
 
    auto listener = tools::coordinator::getListenerSocket(argv[2]);
 
-
+   /**
+    * 
+   
    PollLoops polling;
    polling.init(listener, initialPartition);
 
@@ -61,7 +63,15 @@ int main(int argc, char* argv[]) {
    std::cout << polling.result << std::endl;
 
    polling.closePolling();
+   */
+   CountLoop counting;
+   counting.init(listener, initialPartition);
 
+   counting.countLoop();
+
+   counting.closePolling();
+
+   std::cout << counting.result << std::endl;
 
    return 0;
 }
