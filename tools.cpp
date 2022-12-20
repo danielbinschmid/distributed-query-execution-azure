@@ -9,8 +9,10 @@
 #include <fstream>
 #include <filesystem>
 #include "HashRanging.h"
-namespace fs = std::filesystem;
+#include <unordered_map>
+#include <algorithm>
 
+namespace fs = std::filesystem;
 
 // ------------------------------- COORDINATOR -------------------------------------
 // ---------------------------------------------------------------------------------
@@ -269,15 +271,14 @@ TaskType tools::worker::deserializeTaskBuffer(std::string buffer, CountPartition
 
 
 
-CountKey::CountKey(int count, size_t key, std::string domain) {
+CountKey::CountKey(int count, std::string domain) {
     this->domain = domain;
     this->count = count;
-    this->key = key;
 }
 
 CountKey::CountKey() {
     this->count = -1;
-    this->key = 0;
+    this->domain = "";
 }
 
 bool CountKey::operator<(const CountKey &other) const {
@@ -285,7 +286,7 @@ bool CountKey::operator<(const CountKey &other) const {
 }
 
 bool CountKey::operator==(const CountKey &other) const {
-    return this->key == other.key;
+    return this->domain == other.domain;
 }
 
 
@@ -293,57 +294,62 @@ void tools::worker::mergeSort(int subPartitionIdx, SortedOccurencesMap &result) 
     HashRanging hashranging;
     std::vector<std::string> filenames;
     hashranging.getMergeSortTasksFilenames(subPartitionIdx, filenames);
-
-    std::map<CountKey, std::string> sortedMap;
-
-    // insert entries iteratively in a binary tree which automatically sorts the entry after every insertion
+    std::unordered_map<std::string, int> countMap;
+    
     for (const auto& filename: filenames) {
         std::fstream content;
         content.open(filename);
 
         for (std::string row; std::getline(content, row, '\n');) {
             auto rowStream = std::stringstream(std::move(row));
-            CountKey newKey;
             std::string domain;
+            int count;
             // Check the domain-count in the second column. Domain is in the third column
             unsigned columnIndex = 0;
             for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
                 switch(columnIndex) {
                     case 0: // hashID
-                        newKey.key = (size_t) atoll(column.c_str());
                         break;
                     case 1: // count
-                        newKey.count = atoi(column.c_str());
+                        count = atoi(column.c_str());
                         break;
                     case 2: // domain
                         domain = column;
                         break;
                 }
             }
-
             // get and update map entry or insert new map entry
-            auto entry = sortedMap.find(newKey);
-            if (entry != sortedMap.end()) {
+            auto entry = countMap.find(domain);
+            if (entry == countMap.end()) {
                 // entry not existing
-                sortedMap.insert(std::make_pair(newKey, domain));
+                countMap.insert(std::make_pair(domain, count));
             } else {
                 // entry exists
-                newKey.count += entry->first.count;
-                sortedMap.insert_or_assign(newKey, domain);
+                count += entry->second;
+                countMap.insert_or_assign(domain, count);
             }
         }
     }
+    std::vector<CountKey> vectorized;
+
+    for(auto kv : countMap) {
+        CountKey yy;
+        yy.count = kv.second;
+        yy.domain = kv.first;
+        vectorized.push_back(yy);
+    } 
+    std::sort(vectorized.begin(), vectorized.end());
 
     // convert map to SortedOccurencesMap
     int topN = 25;
     result.reserve(topN);
     int i = 0;
-    auto it = sortedMap.end();
+    auto it = vectorized.end();
     it--;
-    while (it != sortedMap.begin()) {
+    while (it != vectorized.begin()) {
         DomainAndCount domainAndCount;
-        domainAndCount.count = it->first.count;
-        domainAndCount.domain = it->second;
+        domainAndCount.count = it->count;
+        domainAndCount.domain = it->domain;
         result.push_back(domainAndCount);
         i++;
         if (i == topN) break;

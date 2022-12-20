@@ -66,12 +66,12 @@ int main(int argc, char* argv[]) {
    */
    CountLoop counting;
    counting.init(listener, initialPartition);
-   // counting.countLoop();
-   
+   counting.countLoop();
+
+
    MergeSortLoop mergeSortLoop(counting);
    mergeSortLoop.run();
-
-   counting.closePolling();
+   mergeSortLoop.closePolling();
 
    std::cout << counting.result << std::endl;
    std::cout << mergeSortLoop.result << std::endl;

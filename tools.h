@@ -13,12 +13,11 @@ class CountKey {
 
     public:
         int count;
-        size_t key;
         std::string domain;
 
         CountKey();
 
-        CountKey(int count, size_t key, std::string domain);
+        CountKey(int count, std::string domain);
 
         bool operator<(const CountKey &other) const;
 

@@ -3,5 +3,5 @@ cmake-build-*/
 build*
 *clickbench*
 .vscode*
-files/partitions/*
 files/top25/*
+files/partitions/*

@@ -226,8 +226,9 @@ void CountLoop::countLoop() {
 
 
     
-    while(!initialPartitions.empty() || !distributedWork.empty())
+    while(!initialPartitions.empty() || !distributedWork.empty()) {
         this->pollIteration(assignWork, recvBytes, workerFailureCallback);
+    }
 
 }
 
@@ -235,6 +236,7 @@ void CountLoop::countLoop() {
 MergeSortLoop::MergeSortLoop(Polling polling) {
     this->initPolling(polling);
     this->initialTasks = std::vector<MergeSortTask>();
+    this->distributedTasks = std::unordered_map<int, MergeSortTask>();
     this->hashranging = HashRanging();
     this->result = 0;
 
@@ -258,7 +260,7 @@ void MergeSortLoop::run() {
 
         if (auto status = send(fd, serializedTask.c_str(), serializedTask.size(), 0); status == -1) {
             perror("send() failed");
-            
+          
             this->initialTasks.push_back(std::move(this->distributedTasks[fd]));
             this->distributedTasks.erase(fd);
         }
@@ -291,9 +293,13 @@ void MergeSortLoop::run() {
         return assignWork(pollFd);
     };
 
+    for (const auto& fd: this->pollFds) {
+        if (fd.fd != this->listener) assignWork(fd.fd);
+    }
 
-    
-    while(!this->initialTasks.empty() || !this->distributedTasks.empty())
+    while(!this->initialTasks.empty() || !this->distributedTasks.empty()) 
         this->pollIteration(assignWork, recvBytes, workerFailureCallback);
+    
+        
 }
 

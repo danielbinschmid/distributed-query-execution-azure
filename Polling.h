@@ -9,14 +9,10 @@ enum CallbackReturn { BREAK_OUTER_LOOP, CONTINUE_INNER_LOOP, DEFAULT_ };
 
 class Polling {
     
-    private:
-        std::vector<pollfd> pollFds;
+ 
+    protected:            
         int listener;
-        
-            // The class
-    protected:             // Access specifier
-
-
+        std::vector<pollfd> pollFds;
         void initPolling(int listener);
         void initPolling(Polling polling);
 
@@ -82,11 +78,12 @@ class MergeSortLoop: public Polling {
     public:
 
         int result;
-        MergeSortLoop(Polling pollingInstance);
+        MergeSortLoop(Polling polling);
 
         ~MergeSortLoop();
 
         void run();
+
 
 
 
