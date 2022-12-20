@@ -17,7 +17,7 @@ class HashInt {
 
 
         bool operator<(const HashInt & other) const;
-        bool operator=(const HashInt & other) const;
+        bool operator==(const HashInt & other) const;
 };
 
 struct DomainAndCount {
@@ -25,8 +25,13 @@ struct DomainAndCount {
     std::string domain;
 };
 
+struct MergeSortTask {
+    int subPartitionIdx;
+};
+
 typedef std::map<HashInt, DomainAndCount> OccurencesMap;
 
+typedef std::vector<DomainAndCount> SortedOccurencesMap;
 
 struct ResultSubPartition {
     OccurencesMap partitionData;
@@ -41,6 +46,9 @@ class HashRanging {
         void urlToDomain(std::string url, std::string &result);
 
         int assignToPartition(HashInt &hash);
+
+        
+    
     public:
         HashRanging();
         ~HashRanging();
@@ -50,6 +58,11 @@ class HashRanging {
 
         void getSubPartitionFilenames(int partitionIdx, std::vector<std::string> &result);
 
+        void getMergeSortTasksFilenames(int subPartitionIdx, std::vector<std::string> &result);
+
         void splitIntoSubPartitions(int partitionIdx, OccurencesMap map, std::vector<ResultSubPartition> &result);
+
+
+        void getInitialMergeSortTasks(std::vector<MergeSortTask> &result);
 
 };

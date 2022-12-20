@@ -21,7 +21,7 @@ HashInt::~HashInt() {
 
 }
 
-bool HashInt::operator=(const HashInt &other) const {
+bool HashInt::operator==(const HashInt &other) const {
     return this->hash == other.hash;
 }
 
@@ -122,6 +122,13 @@ void HashRanging::getSubPartitionFilenames(int partitionIdx, std::vector<std::st
     }
 }
 
+void HashRanging::getMergeSortTasksFilenames(int subPartitionIdx, std::vector<std::string> &result) {
+    for (int i = 0; i < config::nInitialPartitions; i++) {
+        std::string fname = "files/partitions/partition-" + std::to_string(i) + "." + std::to_string(subPartitionIdx) + ".csv";
+        result.push_back(fname);
+    }
+}
+
 
 void HashRanging::splitIntoSubPartitions(int partitionIdx, OccurencesMap map, std::vector<ResultSubPartition> &result) {
     std::vector<std::string> subPartitionFilenames;
@@ -152,4 +159,13 @@ HashRanging::HashRanging() {
 }
 HashRanging::~HashRanging() {
 
+}
+
+void HashRanging::getInitialMergeSortTasks(std::vector<MergeSortTask> &result) {
+    result.reserve(config::nAggregates);
+    for (int i = 0; i < config::nAggregates; i++) {
+        MergeSortTask task;
+        task.subPartitionIdx = i + 1;
+        result.push_back(task);
+    }
 }

@@ -18,6 +18,7 @@ class Polling {
 
 
         void initPolling(int listener);
+        void initPolling(Polling polling);
 
         /**
          * 
@@ -68,4 +69,25 @@ class CountLoop: public Polling {
         void init(int listener, std::vector<std::string> initialPartitions);
 
         void countLoop();
+};
+
+
+
+class MergeSortLoop: public Polling {
+    private: 
+        std::vector<MergeSortTask> initialTasks;
+        std::unordered_map<int, MergeSortTask> distributedTasks;
+        HashRanging hashranging;
+
+    public:
+
+        int result;
+        MergeSortLoop(Polling pollingInstance);
+
+        ~MergeSortLoop();
+
+        void run();
+
+
+
 };

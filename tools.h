@@ -8,7 +8,29 @@ struct CountPartitionTask {
     std::string url;
 };
 
+class CountKey {
+    private:
+
+    public:
+        int count;
+        size_t key;
+        std::string domain;
+
+        CountKey();
+
+        CountKey(int count, size_t key, std::string domain);
+
+        bool operator<(const CountKey &other) const;
+
+        bool operator==(const CountKey &other) const;
+};
+
+
+enum TaskType {COUNT, MERGE_SORT, NONE};
+
 namespace tools {
+
+    void getSubPartitionTop25Filename(int subPartitionIdx, std::string &result);
 
     namespace coordinator {
         int getListenerSocket(char* port);
@@ -20,19 +42,26 @@ namespace tools {
 
         void getInitialPartitionsHttp(char* pathToCsv,  std::vector<std::string> &todoOutput);
 
-        void serializeCountPartitionTask(CountPartitionTask task, std::string &result) ;
+        void serializeCountPartitionTask(CountPartitionTask task, std::string &result);
+
+        void serializeMergeSortTask(MergeSortTask task, std::string &result);
+        
     }
 
 
     namespace worker {
         size_t countGoogleRuOccurrences(std::string_view url);
 
+        TaskType deserializeTaskBuffer(std::string buffer, CountPartitionTask &countTask, MergeSortTask &mergeSortTask);
 
-        void deserializeCountPartitionTask(std::string buffer, CountPartitionTask &task);
 
         void getOccurencesMap(std::string_view url, OccurencesMap &result);
 
         void storeOccurencesMapToDisk(int partitionIdx, OccurencesMap map);
+
+        void storeTop25ToDisk(int subPartitionIndex, SortedOccurencesMap top25);
         
+        void mergeSort(int subPartitionIdx, SortedOccurencesMap &result);
+
     } 
 }

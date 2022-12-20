@@ -210,15 +210,23 @@ void tools::worker::storeOccurencesMapToDisk(int partitionIdx, OccurencesMap map
 
 }
 
+
+
+// -------------------------------- SERIALIZATION & DESERIALIZATION -----------------------------------
+
 #define DELIMITER ';'
+#define DELIMITER_TASKTYPE '|'
 
 void tools::coordinator::serializeCountPartitionTask(CountPartitionTask task, std::string &result) {
     // first 
-    result = std::to_string(task.partitionIdx) + DELIMITER + task.url; 
+    result = std::to_string(TaskType::COUNT) + DELIMITER_TASKTYPE + std::to_string(task.partitionIdx) + DELIMITER + task.url; 
 }
 
+void tools::coordinator::serializeMergeSortTask(MergeSortTask task, std::string &result) {
+    result = std::to_string(TaskType::MERGE_SORT) + DELIMITER_TASKTYPE + std::to_string(task.subPartitionIdx) + DELIMITER;
+}
 
-void tools::worker::deserializeCountPartitionTask(std::string buffer, CountPartitionTask &task) {
+void deserializeCountPartitionTask(std::string buffer, CountPartitionTask &task) {
     int i = 0;
     while (buffer[i] != DELIMITER) i++;
     
@@ -226,6 +234,148 @@ void tools::worker::deserializeCountPartitionTask(std::string buffer, CountParti
 
     task.url = buffer.substr(i, buffer.size() - i);
 }
-        
 
+void deserializeMergeSortTask(std::string buffer, MergeSortTask &taskResult) {
+    int i = 0;
+    while (buffer[i] != DELIMITER) i++;
+    
+    taskResult.subPartitionIdx = std::stoi(buffer.substr(0, i));
+
+}
+
+TaskType tools::worker::deserializeTaskBuffer(std::string buffer, CountPartitionTask &countTask, MergeSortTask &mergeSortTask) {
+    int i = 0;
+    while (buffer[i] != DELIMITER_TASKTYPE) i++;
+    
+    switch(std::stoi(buffer.substr(0, i))) {
+        case TaskType::MERGE_SORT:
+            std::cout << "Deserialized task: " << buffer.substr(i + 1, buffer.size() - i - 1) << std::endl;
+            deserializeMergeSortTask(buffer.substr(i + 1, buffer.size() - i - 1), mergeSortTask);
+            return TaskType::MERGE_SORT;
+            
+        case TaskType::COUNT:
+            deserializeCountPartitionTask(buffer.substr(i + 1, buffer.size() - i - 1), countTask);
+            return TaskType::COUNT;
+
+            break;
+        default:
+            std::cerr << "Unknown task type received" << std::endl;
+            return TaskType::NONE;
+    }
+
+
+}
+
+
+
+
+CountKey::CountKey(int count, size_t key, std::string domain) {
+    this->domain = domain;
+    this->count = count;
+    this->key = key;
+}
+
+CountKey::CountKey() {
+    this->count = -1;
+    this->key = 0;
+}
+
+bool CountKey::operator<(const CountKey &other) const {
+    return this->count < other.count;
+}
+
+bool CountKey::operator==(const CountKey &other) const {
+    return this->key == other.key;
+}
+
+
+void tools::worker::mergeSort(int subPartitionIdx, SortedOccurencesMap &result) {
+    HashRanging hashranging;
+    std::vector<std::string> filenames;
+    hashranging.getMergeSortTasksFilenames(subPartitionIdx, filenames);
+
+    std::map<CountKey, std::string> sortedMap;
+
+    // insert entries iteratively in a binary tree which automatically sorts the entry after every insertion
+    for (const auto& filename: filenames) {
+        std::fstream content;
+        content.open(filename);
+
+        for (std::string row; std::getline(content, row, '\n');) {
+            auto rowStream = std::stringstream(std::move(row));
+            CountKey newKey;
+            std::string domain;
+            // Check the domain-count in the second column. Domain is in the third column
+            unsigned columnIndex = 0;
+            for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
+                switch(columnIndex) {
+                    case 0: // hashID
+                        newKey.key = (size_t) atoll(column.c_str());
+                        break;
+                    case 1: // count
+                        newKey.count = atoi(column.c_str());
+                        break;
+                    case 2: // domain
+                        domain = column;
+                        break;
+                }
+            }
+
+            // get and update map entry or insert new map entry
+            auto entry = sortedMap.find(newKey);
+            if (entry != sortedMap.end()) {
+                // entry not existing
+                sortedMap.insert(std::make_pair(newKey, domain));
+            } else {
+                // entry exists
+                newKey.count += entry->first.count;
+                sortedMap.insert_or_assign(newKey, domain);
+            }
+        }
+    }
+
+    // convert map to SortedOccurencesMap
+    int topN = 25;
+    result.reserve(topN);
+    int i = 0;
+    auto it = sortedMap.end();
+    it--;
+    while (it != sortedMap.begin()) {
+        DomainAndCount domainAndCount;
+        domainAndCount.count = it->first.count;
+        domainAndCount.domain = it->second;
+        result.push_back(domainAndCount);
+        i++;
+        if (i == topN) break;
+        it--;
+    } 
+}
+
+void tools::getSubPartitionTop25Filename(int subPartitionIdx, std::string &result) {
+    result = "files/top25/top25-" + std::to_string(subPartitionIdx) + ".csv";
+}
+
+void domainCountToLocalFile(ResultSubPartition partition) {
+    std::ofstream outfile;
+    outfile.open(partition.filename, std::ofstream::out | std::ofstream::trunc);
+
+    for (auto it = partition.partitionData.begin(); it != partition.partitionData.end(); it++)
+        outfile << it->first.hashString << "\t" << std::to_string(it->second.count) << "\t" << it->second.domain << std::endl;
+
+    outfile.close();
+}
+
+void tools::worker::storeTop25ToDisk(int subPartitionIdx, SortedOccurencesMap top25) {
+    std::ofstream outfile;
+    std::string filename;
+    tools::getSubPartitionTop25Filename(subPartitionIdx, filename);
+
+    outfile.open(filename, std::ofstream::out | std::ofstream::trunc);
+
+    for (const auto& domain: top25) {
+        outfile << domain.domain << "\t" << std::to_string(domain.count) << std::endl;
+    }
+
+    outfile.close();
+}
 

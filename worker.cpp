@@ -111,19 +111,34 @@ breakConnect:
          break;
       }
 
-
+      // Get and deserialize incoming task-buffer
       auto taskSerialized = std::string(buffer.data(), static_cast<size_t>(numBytes));
-      
-      CountPartitionTask task;
-      tools::worker::deserializeCountPartitionTask(taskSerialized, task);
+      CountPartitionTask countTask;
+      MergeSortTask mergeSortTask;
+      TaskType tasktype = tools::worker::deserializeTaskBuffer(taskSerialized, countTask, mergeSortTask);
 
+      // do task
+      auto result = 0;
       OccurencesMap occurrencesMap;
-      tools::worker::getOccurencesMap(task.url, occurrencesMap);
+      SortedOccurencesMap top25;
+      switch(tasktype) {
+         case TaskType::COUNT: 
+            std::cout << countTask.url << std::endl;
+            tools::worker::getOccurencesMap(countTask.url, occurrencesMap);
+            tools::worker::storeOccurencesMapToDisk(countTask.partitionIdx, occurrencesMap);
+            result = 1;
+            break;
+         
+         case TaskType::MERGE_SORT:
+            std::cout << "SubPartition: " << mergeSortTask.subPartitionIdx << std::endl;
+            tools::worker::mergeSort(mergeSortTask.subPartitionIdx, top25);
+            tools::worker::storeTop25ToDisk(mergeSortTask.subPartitionIdx, top25);
+            result = 1;
+            break;
+         default:
+            std::cerr << "task type not known to worker" << std::endl; 
+      }
 
-      tools::worker::storeOccurencesMapToDisk(task.partitionIdx, occurrencesMap);
-
-      
-      auto result = 1;
       auto response = std::to_string(result);
       if (send(connection, response.c_str(), response.size(), 0) == -1) {
          perror("send() failed");
