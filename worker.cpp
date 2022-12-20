@@ -63,7 +63,6 @@ int main(int argc, char* argv[]) {
       std::cerr << "Usage: " << argv[0] << " <host> <port>" << std::endl;
       return 1;
    }
-   std::cout << "Start worker" << std::endl;
 
    // ------------------------------- CONNECT TO COORDINATOR ---------------------------------
    // Set up the connection
