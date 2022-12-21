@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include "AzureBlobClient.h"
 #include "config.h"
+#include "tools.h"
+#define N_BYTES_RECEIVED 1024
 
 #define TRUE 1
 #define FALSE 0
@@ -33,15 +35,14 @@ void log(int code, const std::string& message) {
    }
 }
 
-size_t processUrl(CurlEasyPtr& curl, std::string_view url) {
+size_t processUrl(std::string_view url) {
    using namespace std::literals;
    size_t result = 0;
    // Download the file
 
    std::string filename = fs::path(std::string(url)).filename();
    std::string filepath = "files/" + filename;
-   curl.easyInit();
-   // auto csvData = getCsvHTTP(curl, std::string(url));
+
    std::fstream content;
    content.open(filepath);
 
@@ -81,7 +82,11 @@ int main(int argc, char* argv[]) {
       return 1;
    }
 
+<<<<<<< HEAD
    std::cout << "Start worker" << std::endl;
+=======
+   // ------------------------------- CONNECT TO COORDINATOR ---------------------------------
+>>>>>>> 5d0fe9ee99cd2bec8e97d6c5d01f5ef208aee5c0
    // Set up the connection
    addrinfo hints = {};
    hints.ai_family = AF_UNSPEC;
@@ -105,12 +110,18 @@ int main(int argc, char* argv[]) {
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
    }
+<<<<<<< HEAD
+=======
+   // ------------------------------------------------------------------------------------------
+
+>>>>>>> 5d0fe9ee99cd2bec8e97d6c5d01f5ef208aee5c0
 
 breakConnect:
    freeaddrinfo(coordinatorAddr);
    check_error(status, "connection() failed");
 
    // Connected
+<<<<<<< HEAD
    auto curlSetup = CurlGlobalSetup();
    auto curl = CurlEasyPtr::easyInit();
    auto buffer = std::array<char, 1024>();
@@ -121,6 +132,43 @@ breakConnect:
    while (numBytes > 0) {
       auto url = std::string_view(buffer.data(), static_cast<size_t>(numBytes));
       auto result = processUrl(curl, url);
+=======
+   auto buffer = std::array<char, N_BYTES_RECEIVED>();
+   while (true) {
+      auto numBytes = recv(connection, buffer.data(), buffer.size(), 0);
+      if (numBytes <= 0) {
+         // connection closed / error
+         break;
+      }
+
+      // Get and deserialize incoming task-buffer
+      auto taskSerialized = std::string(buffer.data(), static_cast<size_t>(numBytes));
+      CountPartitionTask countTask;
+      MergeSortTask mergeSortTask;
+      TaskType tasktype = tools::worker::deserializeTaskBuffer(taskSerialized, countTask, mergeSortTask);
+
+      // do task
+      auto result = 0;
+      OccurencesMap occurrencesMap;
+      SortedOccurencesMap top25;
+      switch(tasktype) {
+         case TaskType::COUNT: 
+            std::cout << countTask.url << std::endl;
+            tools::worker::getOccurencesMap(countTask.url, occurrencesMap);
+            tools::worker::storeOccurencesMapToDisk(countTask.partitionIdx, occurrencesMap);
+            result = 1;
+            break;
+         
+         case TaskType::MERGE_SORT:
+            std::cout << "SubPartition: " << mergeSortTask.subPartitionIdx << std::endl;
+            tools::worker::mergeSort(mergeSortTask.subPartitionIdx, top25);
+            tools::worker::storeTop25ToDisk(mergeSortTask.subPartitionIdx, top25);
+            result = 1;
+            break;
+         default:
+            std::cerr << "task type not known to worker" << std::endl; 
+      }
+>>>>>>> 5d0fe9ee99cd2bec8e97d6c5d01f5ef208aee5c0
 
       auto response = std::to_string(result);
       auto bytesSent = send(connection, response.c_str(), response.size(), 0);

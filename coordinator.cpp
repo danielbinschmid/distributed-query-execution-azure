@@ -66,12 +66,18 @@ int main(int argc, char* argv[]) {
 
    auto listener = tools::coordinator::getListenerSocket(argv[2]);
 
+   /**
+    * 
    PollLoops polling;
    polling.init(listener, initialPartition);
    polling.pollLoop();
 
    std::cout << polling.result << std::endl;
    polling.closePolling();
+   */
+   CountLoop counting;
+   counting.init(listener, initialPartition);
+   counting.countLoop();
 
    const std::string accountName = config::credentials::accountName;
    const std::string accountToken = config::credentials::accountToken;
@@ -98,5 +104,11 @@ int main(int argc, char* argv[]) {
       }
    }
    
+   MergeSortLoop mergeSortLoop(counting);
+   mergeSortLoop.run();
+   mergeSortLoop.closePolling();
+
+   std::cout << counting.result << std::endl;
+   std::cout << mergeSortLoop.result << std::endl;
    return 0;
 }

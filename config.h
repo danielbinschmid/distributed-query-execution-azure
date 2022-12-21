@@ -1,13 +1,19 @@
 #pragma once
 #include <string>
 
+enum HashMethod { BOOST, CUSTOM };
+
+
 /**
  * Contains configuration constants shared in coordinator and workers
 */
 namespace config {
     // Number of aggregates/ range buckets for hash ranging
+    const int nInitialPartitions = 100;
     static const int nAggregates = 10;
+
     static const std::string resultFilename = "result_file";
+    static const HashMethod hashmethod = HashMethod::BOOST; 
 
     /**
      * Get your credentials via

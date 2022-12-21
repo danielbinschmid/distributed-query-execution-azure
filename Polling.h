@@ -3,17 +3,18 @@
 #include <unordered_map>
 #include <functional>
 #include <string>
-
+#include "tools.h"
 enum CallbackReturn { BREAK_OUTER_LOOP, CONTINUE_INNER_LOOP, DEFAULT_ };
 
 
 class Polling {
-    private:
-        std::vector<pollfd> pollFds;
+    
+ 
+    protected:            
         int listener;
-            // The class
-    protected:             // Access specifier
+        std::vector<pollfd> pollFds;
         void initPolling(int listener);
+        void initPolling(Polling polling);
 
         /**
          * 
@@ -44,5 +45,43 @@ class PollLoops: public Polling {
         size_t result;
         void init(int listener, std::vector<std::string> initialPartitions);
         void pollLoop();
+
+};
+
+
+
+class CountLoop: public Polling {
+    private:
+        std::vector<CountPartitionTask> initialPartitions;
+
+        std::unordered_map<int, CountPartitionTask> distributedWork;
+
+
+    public:
+        int result;
+        void init(int listener, std::vector<std::string> initialPartitions);
+
         void countLoop();
+};
+
+
+
+class MergeSortLoop: public Polling {
+    private: 
+        std::vector<MergeSortTask> initialTasks;
+        std::unordered_map<int, MergeSortTask> distributedTasks;
+        HashRanging hashranging;
+
+    public:
+
+        int result;
+        MergeSortLoop(Polling polling);
+
+        ~MergeSortLoop();
+
+        void run();
+
+
+
+
 };
