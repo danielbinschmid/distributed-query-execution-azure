@@ -12,47 +12,12 @@
 #include "config.h"
 #include "tools.h"
 #define N_BYTES_RECEIVED 1024
-
+#define RECONNECT_PATIENCE 500 // in ms
+#define N_CONNECT_TRIES 500
 namespace fs = std::filesystem;
 
 
 
-size_t processUrl(std::string_view url) {
-   using namespace std::literals;
-   size_t result = 0;
-   // Download the file
-
-   std::string filename = fs::path(std::string(url)).filename();
-   std::string filepath = "files/" + filename;
-
-   std::fstream content;
-   content.open(filepath);
-
-   
-   for (std::string row; std::getline(content, row, '\n');) {
-      auto rowStream = std::stringstream(std::move(row));
-
-      // Check the URL in the second column
-      unsigned columnIndex = 0;
-      for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
-         // column 0 is id, 1 is URL
-         if (columnIndex == 1) {
-            // Check if URL is "google.ru"
-
-            // TODO: replace with counting the URLs
-
-            auto pos = column.find("://"sv);
-            if (pos != std::string::npos) {
-               auto afterProtocol = std::string_view(column).substr(pos + 3);
-               if (afterProtocol.starts_with("google.ru/"))
-                  ++result;
-            }
-            break;
-         }
-      }
-   }
-   return result;
-}
 
 /// Worker process that receives a list of URLs and reports the result
 /// Example:
@@ -77,7 +42,7 @@ int main(int argc, char* argv[]) {
 
    // Try to connect to coordinator
    int connection, status;
-   for (unsigned i = 0; i < 10; ++i) {
+   for (unsigned i = 0; i < N_CONNECT_TRIES; ++i) {
       for (auto iter = coordinatorAddr; iter; iter = iter->ai_next) {
          connection = socket(iter->ai_family, iter->ai_socktype, iter->ai_protocol);
          if (connection == -1) {
@@ -89,7 +54,7 @@ int main(int argc, char* argv[]) {
             goto breakConnect;
          close(connection);
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      std::this_thread::sleep_for(std::chrono::milliseconds(RECONNECT_PATIENCE));
    }
    // ------------------------------------------------------------------------------------------
 
@@ -122,14 +87,14 @@ breakConnect:
       SortedOccurencesMap top25;
       switch(tasktype) {
          case TaskType::COUNT: 
-            std::cout << countTask.url << std::endl;
+            if (config::logging) std::cout << countTask.url << std::endl;
             tools::worker::getOccurencesMap(countTask.url, occurrencesMap);
             tools::worker::storeOccurencesMapToDisk(countTask.partitionIdx, occurrencesMap);
             result = 1;
             break;
          
          case TaskType::MERGE_SORT:
-            std::cout << "SubPartition: " << mergeSortTask.subPartitionIdx << std::endl;
+            if (config::logging) std::cout << "SubPartition: " << mergeSortTask.subPartitionIdx << std::endl;
             tools::worker::mergeSort(mergeSortTask.subPartitionIdx, top25);
             tools::worker::storeTop25ToDisk(mergeSortTask.subPartitionIdx, top25);
             result = 1;

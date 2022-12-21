@@ -11,7 +11,7 @@
 #include "HashRanging.h"
 #include <unordered_map>
 #include <algorithm>
-
+#include "AzureBlobClient.h"
 namespace fs = std::filesystem;
 
 // ------------------------------- COORDINATOR -------------------------------------
@@ -76,19 +76,35 @@ void tools::coordinator::getInitialPartitionsAzure(char* pathToCsv,  std::vector
 }
 
 void tools::coordinator::getInitialPartitionsLocalFiles(char* pathToCsv, std::vector<std::string> &todoOutput) {
-    std::fstream fs;
-    fs.open(std::string(pathToCsv));
 
-    while(!fs.eof()) {
-        std::string output;
-        std::getline(fs, output);
-        if (output.size() == 0) break;
-        todoOutput.push_back(std::move(output));
-        
+    if (config::io_type == IO_TYPE::LOCAL) {
+        std::fstream fs;
+        fs.open(std::string(pathToCsv));
+
+        while(!fs.eof()) {
+            std::string output;
+            std::getline(fs, output);
+            if (output.size() == 0) break;
+            todoOutput.push_back(std::move(output));
+            
+        }
+        fs.close();
+    } else if(config::io_type == IO_TYPE::AZURE_BLOB) {
+        static const std::string accountName = config::credentials::accountName;
+        static const std::string accountToken = config::credentials::accountToken;
+        auto blobClient = AzureBlobClient(accountName, accountToken);
+        blobClient.setContainer("urls");
+
+        auto fs = blobClient.downloadStringStream(std::string(pathToCsv));
+
+        while(!fs.eof()) {
+            std::string output;
+            std::getline(fs, output);
+            if (output.size() == 0) break;
+            todoOutput.push_back(std::move(output));
+            
+        }
     }
-
-
-    fs.close();
 }
 
 void tools::coordinator::getInitialPartitionsHttp(char* pathToCsv, std::vector<std::string> &todoOutput) {
@@ -108,42 +124,6 @@ void tools::coordinator::getInitialPartitionsHttp(char* pathToCsv, std::vector<s
 // ---------------------------------------------------------------------------------
 // ---------------------------------------------------------------------------------
 
-size_t tools::worker::countGoogleRuOccurrences(std::string_view url) {
-    using namespace std::literals;
-    size_t result = 0;
-    // Download the file
-
-    std::string filename = fs::path(std::string(url)).filename();
-    std::string filepath = "files/" + filename;
-
-    std::fstream content;
-    content.open(filepath);
-
-
-    for (std::string row; std::getline(content, row, '\n');) {
-        auto rowStream = std::stringstream(std::move(row));
-
-        // Check the URL in the second column
-        unsigned columnIndex = 0;
-        for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
-            // column 0 is id, 1 is URL
-            if (columnIndex == 1) {
-            // Check if URL is "google.ru"
-
-            // TODO: replace with counting the URLs
-
-            auto pos = column.find("://"sv);
-            if (pos != std::string::npos) {
-                auto afterProtocol = std::string_view(column).substr(pos + 3);
-                if (afterProtocol.starts_with("google.ru/"))
-                    ++result;
-            }
-            break;
-            }
-        }
-    }
-    return result;
-}
 
 
 
@@ -152,51 +132,115 @@ void tools::worker::getOccurencesMap(std::string_view url, OccurencesMap &result
     std::string filename = fs::path(std::string(url)).filename();
     std::string filepath = "files/" + filename;
 
-    std::fstream content;
-    content.open(filepath);
+    
 
-    HashRanging hashranging;
+    if (config::io_type == IO_TYPE::LOCAL) {
+        std::fstream content;
+        content.open(filepath);
 
+        HashRanging hashranging;
+        for (std::string row; std::getline(content, row, '\n');) {
+            auto rowStream = std::stringstream(std::move(row));
 
-    for (std::string row; std::getline(content, row, '\n');) {
-        auto rowStream = std::stringstream(std::move(row));
+            // Check the URL in the second column
+            unsigned columnIndex = 0;
+            for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
+                // column 0 is id, 1 is URL
+                if (columnIndex == 1) {
+                    // parse url to domain
+                    HashInt hash;
+                    std::string domain;
+                    hashranging.hashDomainOfUrl(column, hash, domain);
 
-        // Check the URL in the second column
-        unsigned columnIndex = 0;
-        for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
-            // column 0 is id, 1 is URL
-            if (columnIndex == 1) {
-                // parse url to domain
-                HashInt hash;
-                std::string domain;
-                hashranging.hashDomainOfUrl(column, hash, domain);
-
-                auto pos = result.find(hash);
-                if (pos == result.end()) {
-                    // insert domain
-                    DomainAndCount domainCount;
-                    domainCount.count = 1;
-                    domainCount.domain = domain;
-                    result.insert(std::make_pair(hash, domainCount));
-                } else {
-                    // increment count of domain
-                    pos->second.count++;
-                    result.insert_or_assign(pos->first, pos->second);
+                    auto pos = result.find(hash);
+                    if (pos == result.end()) {
+                        // insert domain
+                        DomainAndCount domainCount;
+                        domainCount.count = 1;
+                        domainCount.domain = domain;
+                        result.insert(std::make_pair(hash, domainCount));
+                    } else {
+                        // increment count of domain
+                        pos->second.count++;
+                        result.insert_or_assign(pos->first, pos->second);
+                    }
                 }
             }
         }
+    } else if(config::io_type == IO_TYPE::AZURE_BLOB) {
+        static const std::string accountName = config::credentials::accountName;
+        static const std::string accountToken = config::credentials::accountToken;
+        auto blobClient = AzureBlobClient(accountName, accountToken);
+        blobClient.setContainer("urls");
+
+        auto content = blobClient.downloadStringStream(std::string(filepath));
+
+
+        HashRanging hashranging;
+        for (std::string row; std::getline(content, row, '\n');) {
+            auto rowStream = std::stringstream(std::move(row));
+
+            // Check the URL in the second column
+            unsigned columnIndex = 0;
+            for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
+                // column 0 is id, 1 is URL
+                if (columnIndex == 1) {
+                    // parse url to domain
+                    HashInt hash;
+                    std::string domain;
+                    hashranging.hashDomainOfUrl(column, hash, domain);
+
+                    auto pos = result.find(hash);
+                    if (pos == result.end()) {
+                        // insert domain
+                        DomainAndCount domainCount;
+                        domainCount.count = 1;
+                        domainCount.domain = domain;
+                        result.insert(std::make_pair(hash, domainCount));
+                    } else {
+                        // increment count of domain
+                        pos->second.count++;
+                        result.insert_or_assign(pos->first, pos->second);
+                    }
+                }
+            }
+        }
+
+
     }
+
+    
+
+    
 }
 
 
 void subPartitionToLocalFile(ResultSubPartition partition) {
-    std::ofstream outfile;
-    outfile.open(partition.filename, std::ofstream::out | std::ofstream::trunc);
+    if (config::io_type == IO_TYPE::LOCAL) {
+        std::ofstream outfile;
+        outfile.open(partition.filename, std::ofstream::out | std::ofstream::trunc);
 
-    for (auto it = partition.partitionData.begin(); it != partition.partitionData.end(); it++)
-        outfile << it->first.hashString << "\t" << std::to_string(it->second.count) << "\t" << it->second.domain << std::endl;
+        for (auto it = partition.partitionData.begin(); it != partition.partitionData.end(); it++)
+            outfile << it->first.hashString << "\t" << std::to_string(it->second.count) << "\t" << it->second.domain << std::endl;
 
-    outfile.close();
+        outfile.close();
+    } else if (config::io_type == IO_TYPE::AZURE_BLOB) {
+
+        static const std::string accountName = config::credentials::accountName;
+        static const std::string accountToken = config::credentials::accountToken;
+        auto blobClient = AzureBlobClient(accountName, accountToken);
+        blobClient.setContainer("urls");
+
+        std::stringstream outfile;
+
+        for (auto it = partition.partitionData.begin(); it != partition.partitionData.end(); it++)
+            outfile << it->first.hashString << "\t" << std::to_string(it->second.count) << "\t" << it->second.domain << std::endl;
+
+        blobClient.uploadStringStream(partition.filename, outfile);
+    }
+
+
+    
 }
 
 
@@ -252,7 +296,7 @@ TaskType tools::worker::deserializeTaskBuffer(std::string buffer, CountPartition
     
     switch(std::stoi(buffer.substr(0, i))) {
         case TaskType::MERGE_SORT:
-            std::cout << "Deserialized task: " << buffer.substr(i + 1, buffer.size() - i - 1) << std::endl;
+            if (config::logging) std::cout << "Deserialized task: " << buffer.substr(i + 1, buffer.size() - i - 1) << std::endl;
             deserializeMergeSortTask(buffer.substr(i + 1, buffer.size() - i - 1), mergeSortTask);
             return TaskType::MERGE_SORT;
             
@@ -298,38 +342,79 @@ void tools::worker::mergeSort(int subPartitionIdx, SortedOccurencesMap &result) 
     std::unordered_map<std::string, int> countMap;
     
     for (const auto& filename: filenames) {
-        std::fstream content;
-        content.open(filename);
 
-        for (std::string row; std::getline(content, row, '\n');) {
-            auto rowStream = std::stringstream(std::move(row));
-            std::string domain;
-            int count;
-            // Check the domain-count in the second column. Domain is in the third column
-            unsigned columnIndex = 0;
-            for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
-                switch(columnIndex) {
-                    case 0: // hashID
-                        break;
-                    case 1: // count
-                        count = atoi(column.c_str());
-                        break;
-                    case 2: // domain
-                        domain = column;
-                        break;
+        if (config::io_type == IO_TYPE::LOCAL) {
+            std::fstream content;
+            content.open(filename);
+
+            for (std::string row; std::getline(content, row, '\n');) {
+                auto rowStream = std::stringstream(std::move(row));
+                std::string domain;
+                int count;
+                // Check the domain-count in the second column. Domain is in the third column
+                unsigned columnIndex = 0;
+                for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
+                    switch(columnIndex) {
+                        case 0: // hashID
+                            break;
+                        case 1: // count
+                            count = atoi(column.c_str());
+                            break;
+                        case 2: // domain
+                            domain = column;
+                            break;
+                    }
+                }
+                // get and update map entry or insert new map entry
+                auto entry = countMap.find(domain);
+                if (entry == countMap.end()) {
+                    // entry not existing
+                    countMap.insert(std::make_pair(domain, count));
+                } else {
+                    // entry exists
+                    count += entry->second;
+                    countMap.insert_or_assign(domain, count);
                 }
             }
-            // get and update map entry or insert new map entry
-            auto entry = countMap.find(domain);
-            if (entry == countMap.end()) {
-                // entry not existing
-                countMap.insert(std::make_pair(domain, count));
-            } else {
-                // entry exists
-                count += entry->second;
-                countMap.insert_or_assign(domain, count);
+        } else if(config::io_type == IO_TYPE::AZURE_BLOB) {
+            static const std::string accountName = config::credentials::accountName;
+            static const std::string accountToken = config::credentials::accountToken;
+            auto blobClient = AzureBlobClient(accountName, accountToken);
+            blobClient.setContainer("urls");
+
+            auto content = blobClient.downloadStringStream(std::string(filename));
+
+            for (std::string row; std::getline(content, row, '\n');) {
+                auto rowStream = std::stringstream(std::move(row));
+                std::string domain;
+                int count;
+                // Check the domain-count in the second column. Domain is in the third column
+                unsigned columnIndex = 0;
+                for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
+                    switch(columnIndex) {
+                        case 0: // hashID
+                            break;
+                        case 1: // count
+                            count = atoi(column.c_str());
+                            break;
+                        case 2: // domain
+                            domain = column;
+                            break;
+                    }
+                }
+                // get and update map entry or insert new map entry
+                auto entry = countMap.find(domain);
+                if (entry == countMap.end()) {
+                    // entry not existing
+                    countMap.insert(std::make_pair(domain, count));
+                } else {
+                    // entry exists
+                    count += entry->second;
+                    countMap.insert_or_assign(domain, count);
+                }
             }
         }
+        
     }
     std::vector<CountKey> vectorized;
 
@@ -363,25 +448,62 @@ void tools::getSubPartitionTop25Filename(int subPartitionIdx, std::string &resul
 }
 
 void domainCountToLocalFile(ResultSubPartition partition) {
-    std::ofstream outfile;
-    std::cout << "saving domain counts into " << partition.filename << std::endl;
-    outfile.open(partition.filename, std::ofstream::out | std::ofstream::trunc);
+    if (config::io_type == IO_TYPE::LOCAL) {
+        std::ofstream outfile;
+        outfile.open(partition.filename, std::ofstream::out | std::ofstream::trunc);
 
-    for (auto it = partition.partitionData.begin(); it != partition.partitionData.end(); it++)
-        outfile << it->first.hashString << "\t" << std::to_string(it->second.count) << "\t" << it->second.domain << std::endl;
+        for (auto it = partition.partitionData.begin(); it != partition.partitionData.end(); it++)
+            outfile << it->first.hashString << "\t" << std::to_string(it->second.count) << "\t" << it->second.domain << std::endl;
 
-    outfile.close();
+        outfile.close();
+    } else if (config::io_type == IO_TYPE::AZURE_BLOB) {
+
+        static const std::string accountName = config::credentials::accountName;
+        static const std::string accountToken = config::credentials::accountToken;
+        auto blobClient = AzureBlobClient(accountName, accountToken);
+        blobClient.setContainer("urls");
+
+        std::stringstream outfile;
+
+        for (auto it = partition.partitionData.begin(); it != partition.partitionData.end(); it++)
+            outfile << it->first.hashString << "\t" << std::to_string(it->second.count) << "\t" << it->second.domain << std::endl;
+
+        blobClient.uploadStringStream(partition.filename, outfile);
+    }
+
+
+    
 }
 
 void tools::storeTop25ToDisk(std::string filename, SortedOccurencesMap top25) {
-    std::ofstream outfile;
-    outfile.open(filename, std::ofstream::out | std::ofstream::trunc);
 
-    for (const auto& domain: top25) {
-        outfile << domain.domain << "\t" << std::to_string(domain.count) << std::endl;
+    if (config::io_type == IO_TYPE::LOCAL) {
+        std::ofstream outfile;
+        outfile.open(filename, std::ofstream::out | std::ofstream::trunc);
+
+        for (const auto& domain: top25) {
+            outfile << domain.domain << "\t" << std::to_string(domain.count) << std::endl;
+        }
+
+        outfile.close();
+    } else if (config::io_type == IO_TYPE::AZURE_BLOB) {
+
+        static const std::string accountName = config::credentials::accountName;
+        static const std::string accountToken = config::credentials::accountToken;
+        auto blobClient = AzureBlobClient(accountName, accountToken);
+        blobClient.setContainer("urls");
+
+        std::stringstream outfile;
+
+        for (const auto& domain: top25) {
+            outfile << domain.domain << "\t" << std::to_string(domain.count) << std::endl;
+        }
+
+        blobClient.uploadStringStream(filename, outfile);
     }
 
-    outfile.close();
+
+    
 }
 
 void tools::worker::storeTop25ToDisk(int subPartitionIdx, SortedOccurencesMap top25) {
@@ -417,30 +539,63 @@ void tools::coordinator::finalMerge(SortedOccurencesMap &result) {
     {
         std::string filename;
         tools::getSubPartitionTop25Filename(i, filename);
-        std::fstream content;
-        content.open(filename);
 
-        int rowCount = 0;
-        for (std::string row; std::getline(content, row, '\n');) {
-            auto rowStream = std::stringstream(std::move(row));
-            DomainAndCount domainCount;
-            unsigned columnIndex = 0;
-            for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
-                switch (columnIndex)
-                {
-                case 0: // domain
-                    domainCount.domain = column;
-                    break;
-                case 1: // count 
-                    domainCount.count = std::atoi(column.c_str());
-                    break;
-                default:
-                    break;
+        if (config::io_type == IO_TYPE::LOCAL) {
+            std::fstream content;
+            content.open(filename);
+
+            int rowCount = 0;
+            for (std::string row; std::getline(content, row, '\n');) {
+                auto rowStream = std::stringstream(std::move(row));
+                DomainAndCount domainCount;
+                unsigned columnIndex = 0;
+                for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
+                    switch (columnIndex)
+                    {
+                    case 0: // domain
+                        domainCount.domain = column;
+                        break;
+                    case 1: // count 
+                        domainCount.count = std::atoi(column.c_str());
+                        break;
+                    default:
+                        break;
+                    }
                 }
+                insertIntoOrdered(result, domainCount);
+                rowCount++;
             }
-            insertIntoOrdered(result, domainCount);
-            rowCount++;
+        } else if(config::io_type == IO_TYPE::AZURE_BLOB) {
+            static const std::string accountName = config::credentials::accountName;
+            static const std::string accountToken = config::credentials::accountToken;
+            auto blobClient = AzureBlobClient(accountName, accountToken);
+            blobClient.setContainer("urls");
+
+            auto content = blobClient.downloadStringStream(std::string(filename));
+
+            int rowCount = 0;
+            for (std::string row; std::getline(content, row, '\n');) {
+                auto rowStream = std::stringstream(std::move(row));
+                DomainAndCount domainCount;
+                unsigned columnIndex = 0;
+                for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
+                    switch (columnIndex)
+                    {
+                    case 0: // domain
+                        domainCount.domain = column;
+                        break;
+                    case 1: // count 
+                        domainCount.count = std::atoi(column.c_str());
+                        break;
+                    default:
+                        break;
+                    }
+                }
+                insertIntoOrdered(result, domainCount);
+                rowCount++;
+            }
         }
+        
 
     }
 }

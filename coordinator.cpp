@@ -6,8 +6,20 @@
 #include "HashRanging.h"
 #include "config.h"
 #include "Polling.h"
-#define LOGGING false
 
+
+#include <chrono>
+using namespace std::chrono;
+
+
+milliseconds getTimeSinceStart(milliseconds startTime, std::string message) {
+   milliseconds downloadedTime = duration_cast< milliseconds >(
+      system_clock::now().time_since_epoch()
+   );
+   std::cout << message << (double) (downloadedTime.count() - startTime.count()) / 1000.0 << " seconds" << std::endl;
+
+   return downloadedTime;
+}
 /**
  * Leader process that coordinates workers. 
  * 
@@ -29,25 +41,45 @@ int main(int argc, char* argv[]) {
 
    // After each range is sorted and merged, merge the top25 aggregates in the coordinator
    // ----------------------------------------------------------   
+   
+   milliseconds coordinatorStartTime = duration_cast< milliseconds >(
+      system_clock::now().time_since_epoch()
+   );
+   if (config::time_measures_logging) {
+      std::cout << "Start coordinator" << std::endl;
+   }
+
 
    std::vector<std::string> initialPartition;
    initialPartition.reserve(100);
    tools::coordinator::getInitialPartitionsLocalFiles(argv[1], initialPartition);
-
+   std::cout << "Initial partitions metadata downloaded. First file is: "<<initialPartition[0] << std::endl;
    auto listener = tools::coordinator::getListenerSocket(argv[2]);
 
+   if (config::time_measures_logging) {
+      getTimeSinceStart(coordinatorStartTime, "Starting counting at ");
+   }
    // counting
    CountLoop counting;
    counting.init(listener, initialPartition);
+   counting.startTime = coordinatorStartTime;
    counting.countLoop();
+
+   if (config::time_measures_logging) {
+      getTimeSinceStart(coordinatorStartTime, "Finished counting at ");
+   }
 
    // merge sort
    MergeSortLoop mergeSortLoop(counting);
    mergeSortLoop.run();
    mergeSortLoop.closePolling();
-   if (LOGGING) {
+   if (config::logging) {
       std::cout << counting.result << std::endl;
       std::cout << mergeSortLoop.result << std::endl;
+   }
+
+   if (config::time_measures_logging) {
+      getTimeSinceStart(coordinatorStartTime, "Finished merge sort from worker side at ");
    }
 
    SortedOccurencesMap finalTop25;
@@ -55,6 +87,9 @@ int main(int argc, char* argv[]) {
 
    tools::storeTop25ToDisk("result.csv", finalTop25);
    
+   if (config::time_measures_logging) {
+      getTimeSinceStart(coordinatorStartTime, "Finished whole query at ");
+   }
    // final merging
 
    

@@ -1,7 +1,7 @@
 #include <boost/functional/hash.hpp>
 #include "HashRanging.h"
 #include <iostream>
-#define LOGGING true
+
 
 HashInt::HashInt(size_t hash) {
     this->init(hash);
@@ -63,7 +63,7 @@ void HashRanging::hashDomainOfUrl(std::string url, HashInt &result, std::string 
 
     result.init(hash);
     
-    if (LOGGING) {
+    if (config::logging) {
         if (hash == 0) {
             std::cout << "Url: " << url << "; was converted to domain: " << domainResult << "; and resulted in hash: " << hash << std::endl;
             std::cout << std::endl;    
