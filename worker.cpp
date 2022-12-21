@@ -12,7 +12,6 @@
 #include <netdb.h>
 #include <sys/socket.h>
 #define N_BYTES_RECEIVED 1024
-#define LOGGING false
 
 namespace fs = std::filesystem;
 

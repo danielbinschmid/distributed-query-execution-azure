@@ -6,7 +6,6 @@
 #include "HashRanging.h"
 #include "config.h"
 #include "Polling.h"
-#define LOGGING false
 
 /**
  * Leader process that coordinates workers. 

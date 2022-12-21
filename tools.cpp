@@ -11,6 +11,7 @@
 #include "HashRanging.h"
 #include <unordered_map>
 #include <algorithm>
+#include "config.h"
 
 namespace fs = std::filesystem;
 
@@ -252,7 +253,9 @@ TaskType tools::worker::deserializeTaskBuffer(std::string buffer, CountPartition
     
     switch(std::stoi(buffer.substr(0, i))) {
         case TaskType::MERGE_SORT:
-            std::cout << "Deserialized task: " << buffer.substr(i + 1, buffer.size() - i - 1) << std::endl;
+            if (LOGGING) {
+                std::cout << "Deserialized task: " << buffer.substr(i + 1, buffer.size() - i - 1) << std::endl;
+            }
             deserializeMergeSortTask(buffer.substr(i + 1, buffer.size() - i - 1), mergeSortTask);
             return TaskType::MERGE_SORT;
             
@@ -364,7 +367,9 @@ void tools::getSubPartitionTop25Filename(int subPartitionIdx, std::string &resul
 
 void domainCountToLocalFile(ResultSubPartition partition) {
     std::ofstream outfile;
-    std::cout << "saving domain counts into " << partition.filename << std::endl;
+    if (LOGGING) {
+        std::cout << "saving domain counts into " << partition.filename << std::endl;
+    }
     outfile.open(partition.filename, std::ofstream::out | std::ofstream::trunc);
 
     for (auto it = partition.partitionData.begin(); it != partition.partitionData.end(); it++)
