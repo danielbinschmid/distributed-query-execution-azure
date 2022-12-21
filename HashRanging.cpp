@@ -107,17 +107,18 @@ void HashRanging::urlToDomain(std::string url, std::string &domainResult) {
 }
 
 int HashRanging::assignToPartition(HashInt &hash) {
-    int partitionIdx = (int) (hash.semanticValue * (double) (config::nAggregates + 1)) - 1;
+    int partitionIdx = (int) (((hash.semanticValue * 10.0) - 1.0) * ((double)(config::nAggregates ) / 9.0));
 
-    if (partitionIdx == -1) 
-        partitionIdx++;
+    if (partitionIdx < 0) 
+        partitionIdx = 0;
+    // std::cout << hash.semanticValue << " HUH " << partitionIdx << std::endl;
     return partitionIdx;
 }
 
 
 void HashRanging::getSubPartitionFilenames(int partitionIdx, std::vector<std::string> &result) {
     for (int i = 0; i < config::nAggregates; i++) {
-        std::string fname = "files/partitions/partition-" + std::to_string(partitionIdx) + "." + std::to_string(i + 1) + ".csv";
+        std::string fname = "files/partitions/partition-" + std::to_string(partitionIdx) + "." + std::to_string(i) + ".csv";
         result.push_back(fname);
     }
 }
@@ -165,7 +166,7 @@ void HashRanging::getInitialMergeSortTasks(std::vector<MergeSortTask> &result) {
     result.reserve(config::nAggregates);
     for (int i = 0; i < config::nAggregates; i++) {
         MergeSortTask task;
-        task.subPartitionIdx = i + 1;
+        task.subPartitionIdx = i;
         result.push_back(task);
     }
 }

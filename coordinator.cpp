@@ -1,28 +1,12 @@
-#include "CurlEasyPtr.h"
-#include <array>
-#include <charconv>
+
 #include <iostream>
-#include <sstream>
-#include <string>
-#include <unordered_map>
-#include <vector>
-#include <netdb.h>
-#include <sys/poll.h>
-#include <unistd.h>
-#include <chrono>
-#include <fstream>
-#include <stdlib.h>
-#include "storage_credential.h"
-#include "storage_account.h"
-#include "blob/blob_client.h"
 
-
-#include "AzureBlobClient.h"
 #include "config.h"
 #include "tools.h"
 #include "HashRanging.h"
 #include "config.h"
 #include "Polling.h"
+#define LOGGING false
 
 /**
  * Leader process that coordinates workers. 
@@ -52,28 +36,27 @@ int main(int argc, char* argv[]) {
 
    auto listener = tools::coordinator::getListenerSocket(argv[2]);
 
-   /**
-    * 
-   
-   PollLoops polling;
-   polling.init(listener, initialPartition);
-
-   polling.pollLoop();
-
-   std::cout << polling.result << std::endl;
-
-   polling.closePolling();
-   */
+   // counting
    CountLoop counting;
    counting.init(listener, initialPartition);
    counting.countLoop();
 
-
+   // merge sort
    MergeSortLoop mergeSortLoop(counting);
    mergeSortLoop.run();
    mergeSortLoop.closePolling();
+   if (LOGGING) {
+      std::cout << counting.result << std::endl;
+      std::cout << mergeSortLoop.result << std::endl;
+   }
 
-   std::cout << counting.result << std::endl;
-   std::cout << mergeSortLoop.result << std::endl;
+   SortedOccurencesMap finalTop25;
+   tools::coordinator::finalMerge(finalTop25);
+
+   tools::storeTop25ToDisk("result.csv", finalTop25);
+   
+   // final merging
+
+   
    return 0;
 }

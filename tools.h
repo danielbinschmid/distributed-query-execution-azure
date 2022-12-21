@@ -31,6 +31,8 @@ namespace tools {
 
     void getSubPartitionTop25Filename(int subPartitionIdx, std::string &result);
 
+    void storeTop25ToDisk(std::string filename, SortedOccurencesMap top25);
+    
     namespace coordinator {
         int getListenerSocket(char* port);
 
@@ -45,6 +47,7 @@ namespace tools {
 
         void serializeMergeSortTask(MergeSortTask task, std::string &result);
         
+        void finalMerge(SortedOccurencesMap &result);
     }
 
 

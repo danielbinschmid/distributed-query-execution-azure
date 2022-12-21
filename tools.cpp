@@ -234,6 +234,7 @@ void deserializeCountPartitionTask(std::string buffer, CountPartitionTask &task)
     
     task.partitionIdx = std::stoi(buffer.substr(0, i));
 
+
     task.url = buffer.substr(i, buffer.size() - i);
 }
 
@@ -241,8 +242,8 @@ void deserializeMergeSortTask(std::string buffer, MergeSortTask &taskResult) {
     int i = 0;
     while (buffer[i] != DELIMITER) i++;
     
+    
     taskResult.subPartitionIdx = std::stoi(buffer.substr(0, i));
-
 }
 
 TaskType tools::worker::deserializeTaskBuffer(std::string buffer, CountPartitionTask &countTask, MergeSortTask &mergeSortTask) {
@@ -363,6 +364,7 @@ void tools::getSubPartitionTop25Filename(int subPartitionIdx, std::string &resul
 
 void domainCountToLocalFile(ResultSubPartition partition) {
     std::ofstream outfile;
+    std::cout << "saving domain counts into " << partition.filename << std::endl;
     outfile.open(partition.filename, std::ofstream::out | std::ofstream::trunc);
 
     for (auto it = partition.partitionData.begin(); it != partition.partitionData.end(); it++)
@@ -371,11 +373,8 @@ void domainCountToLocalFile(ResultSubPartition partition) {
     outfile.close();
 }
 
-void tools::worker::storeTop25ToDisk(int subPartitionIdx, SortedOccurencesMap top25) {
+void tools::storeTop25ToDisk(std::string filename, SortedOccurencesMap top25) {
     std::ofstream outfile;
-    std::string filename;
-    tools::getSubPartitionTop25Filename(subPartitionIdx, filename);
-
     outfile.open(filename, std::ofstream::out | std::ofstream::trunc);
 
     for (const auto& domain: top25) {
@@ -383,5 +382,64 @@ void tools::worker::storeTop25ToDisk(int subPartitionIdx, SortedOccurencesMap to
     }
 
     outfile.close();
+}
+
+void tools::worker::storeTop25ToDisk(int subPartitionIdx, SortedOccurencesMap top25) {
+    
+    std::string filename;
+    tools::getSubPartitionTop25Filename(subPartitionIdx, filename);
+    tools::storeTop25ToDisk(filename, top25);
+    
+}
+
+void insertIntoOrdered(std::vector<DomainAndCount>& results, DomainAndCount result) {
+    int index = 0;
+    while ((size_t) index < results.size() && results[(size_t) index++].count > result.count);
+    SortedOccurencesMap::iterator target = results.begin();
+
+  
+    results.insert(target + index, result);
+    if (results.size() > 25) results.pop_back();
+    
+    
+    
+    
+}
+
+
+
+void tools::coordinator::finalMerge(SortedOccurencesMap &result) {
+    result.reserve(26);
+
+    for (int i = 0; i < config::nAggregates; i++)
+    {
+        std::string filename;
+        tools::getSubPartitionTop25Filename(i, filename);
+        std::fstream content;
+        content.open(filename);
+
+        int rowCount = 0;
+        for (std::string row; std::getline(content, row, '\n');) {
+            auto rowStream = std::stringstream(std::move(row));
+            DomainAndCount domainCount;
+            unsigned columnIndex = 0;
+            for (std::string column; std::getline(rowStream, column, '\t'); ++columnIndex) {
+                switch (columnIndex)
+                {
+                case 0: // domain
+                    domainCount.domain = column;
+                    break;
+                case 1: // count 
+                    domainCount.count = std::atoi(column.c_str());
+                    break;
+                default:
+                    break;
+                }
+            }
+            insertIntoOrdered(result, domainCount);
+            rowCount++;
+        }
+
+    }
 }
 
