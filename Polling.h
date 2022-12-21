@@ -4,6 +4,9 @@
 #include <functional>
 #include <string>
 #include "tools.h"
+#include <chrono>
+using namespace std::chrono;
+
 enum CallbackReturn { BREAK_OUTER_LOOP, CONTINUE_INNER_LOOP, DEFAULT_ };
 
 
@@ -59,9 +62,9 @@ class CountLoop: public Polling {
 
         std::unordered_map<int, CountPartitionTask> distributedWork;
 
-
     public:
         int result;
+        milliseconds startTime;
         void init(int listener, std::vector<std::string> initialPartitions);
 
         void countLoop();

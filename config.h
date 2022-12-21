@@ -1,10 +1,9 @@
 #pragma once
 #include <string>
-// used for logging everywhere
-#define LOGGING false
 
 enum HashMethod { BOOST, CUSTOM };
 
+enum IO_TYPE { AZURE_BLOB, LOCAL};
 
 /**
  * Contains configuration constants shared in coordinator and workers
@@ -12,8 +11,13 @@ enum HashMethod { BOOST, CUSTOM };
 namespace config {
     // Number of aggregates/ range buckets for hash ranging
     const int nInitialPartitions = 100;
-    static const int nAggregates = 25;
+    static const int nAggregates = 5;
     static const HashMethod hashmethod = HashMethod::BOOST; 
+    const bool io_type = IO_TYPE::AZURE_BLOB;
+
+    // logging
+    const bool logging = false;
+    const bool time_measures_logging = true;
 
     /**
      * Get your credentials via
@@ -25,6 +29,5 @@ namespace config {
         static const std::string accountName = "";
         // Access token for Azure storage
         static const std::string accountToken = "";
-    }
+        }
 }
-

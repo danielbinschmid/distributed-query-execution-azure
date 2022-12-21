@@ -6,6 +6,17 @@
 #include <unistd.h>
 #include <charconv>
 
+
+
+milliseconds getTimeSinceStart2(milliseconds startTime, std::string message) {
+   milliseconds downloadedTime = duration_cast< milliseconds >(
+      system_clock::now().time_since_epoch()
+   );
+   std::cout << message << (double) (downloadedTime.count() - startTime.count()) / 1000.0 << " seconds" << std::endl;
+
+   return downloadedTime;
+}
+
 void Polling::initPolling(int listener) {
 
     this->pollFds.push_back(pollfd{
@@ -188,6 +199,8 @@ void CountLoop::countLoop() {
         const auto& task = distributedWork[fd];
         std::string serializedTask; 
         tools::coordinator::serializeCountPartitionTask(task, serializedTask);
+
+        if (config::time_measures_logging) getTimeSinceStart2(this->startTime, "sending task" + std::to_string(task.partitionIdx) + " at ");
 
         if (auto status = send(fd, serializedTask.c_str(), serializedTask.size(), 0); status == -1) {
             perror("send() failed");
