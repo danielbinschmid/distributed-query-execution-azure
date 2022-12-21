@@ -13,7 +13,7 @@ namespace config {
     const int nInitialPartitions = 100;
     static const int nAggregates = 5;
     static const HashMethod hashmethod = HashMethod::BOOST; 
-    const bool io_type = IO_TYPE::AZURE_BLOB;
+    const bool io_type = IO_TYPE::LOCAL;
 
     // logging
     const bool logging = false;
