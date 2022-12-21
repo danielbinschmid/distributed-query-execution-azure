@@ -8,12 +8,30 @@
 #include <sys/socket.h>
 #include <filesystem>
 #include <fstream>
+#include <unistd.h>
 #include "AzureBlobClient.h"
 #include "config.h"
 
+#define TRUE 1
+#define FALSE 0
+#define DEBUG TRUE
+
 namespace fs = std::filesystem;
 
+void check_error(int code, const std::string& message) {
+   if (code < 0) {
+      fprintf(stderr, "[ERROR] (worker): %s\n", message.c_str());
+      exit(1);
+   }
+}
 
+void log(int code, const std::string& message) {
+   if (code < 0) {
+      printf("[INFO] (worker): %s\n", message.c_str());
+   } else {
+      printf("[WARN] (worker): %s\n", message.c_str());
+   }
+}
 
 size_t processUrl(CurlEasyPtr& curl, std::string_view url) {
    using namespace std::literals;
@@ -62,26 +80,24 @@ int main(int argc, char* argv[]) {
       std::cerr << "Usage: " << argv[0] << " <host> <port>" << std::endl;
       return 1;
    }
+
    std::cout << "Start worker" << std::endl;
    // Set up the connection
    addrinfo hints = {};
    hints.ai_family = AF_UNSPEC;
    hints.ai_socktype = SOCK_STREAM;
    addrinfo* coordinatorAddr = nullptr;
-   if (auto status = getaddrinfo(argv[1], argv[2], &hints, &coordinatorAddr); status != 0) {
-      std::cerr << "getaddrinfo() failed: " << gai_strerror(status) << std::endl;
-      return 1;
-   }
+
+   auto status = getaddrinfo(argv[1], argv[2], &hints, &coordinatorAddr);
+   check_error((int) status, "getaddrinfo failed");
 
    // Try to connect to coordinator
-   int connection, status;
+   int connection;
    for (unsigned i = 0; i < 10; ++i) {
       for (auto iter = coordinatorAddr; iter; iter = iter->ai_next) {
          connection = socket(iter->ai_family, iter->ai_socktype, iter->ai_protocol);
-         if (connection == -1) {
-            std::cerr << "socket() failed: " << strerror(connection) << std::endl;
-            return 1;
-         }
+         check_error(connection, "socket() failed");;
+
          status = connect(connection, iter->ai_addr, iter->ai_addrlen);
          if (status != -1)
             goto breakConnect;
@@ -89,31 +105,29 @@ int main(int argc, char* argv[]) {
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
    }
+
 breakConnect:
    freeaddrinfo(coordinatorAddr);
-   if (status == -1) {
-      perror("connect() failed");
-      return 1;
-   }
+   check_error(status, "connection() failed");
 
    // Connected
    auto curlSetup = CurlGlobalSetup();
    auto curl = CurlEasyPtr::easyInit();
    auto buffer = std::array<char, 1024>();
-   while (true) {
-      auto numBytes = recv(connection, buffer.data(), buffer.size(), 0);
-      if (numBytes <= 0) {
-         // connection closed / error
-         break;
-      }
+   
+   auto numBytes = recv(connection, buffer.data(), buffer.size(), 0);
+   check_error((int) numBytes, "recv() failed");
+
+   while (numBytes > 0) {
       auto url = std::string_view(buffer.data(), static_cast<size_t>(numBytes));
       auto result = processUrl(curl, url);
 
       auto response = std::to_string(result);
-      if (send(connection, response.c_str(), response.size(), 0) == -1) {
-         perror("send() failed");
-         break;
-      }
+      auto bytesSent = send(connection, response.c_str(), response.size(), 0);
+      check_error((int) bytesSent, "send() failed");
+
+      numBytes = recv(connection, buffer.data(), buffer.size(), 0);
+      check_error((int) numBytes, "recv() failed");
    }
 
    close(connection);

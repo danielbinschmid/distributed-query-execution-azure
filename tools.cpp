@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <vector>
 #include <fstream>
+
+#include "config.h"
+
 int tools::coordinator::getListenerSocket(char* port) {
     addrinfo hints = {};
     hints.ai_flags = AI_PASSIVE;
@@ -56,7 +59,6 @@ int tools::coordinator::getListenerSocket(char* port) {
     return listener;   
 }
 
-
 void tools::coordinator::getInitialPartitionsAzure(char* pathToCsv,  std::vector<std::string> &todoOutput) {
     pathToCsv[0] = '\0';
     todoOutput.at(0);
@@ -75,7 +77,6 @@ void tools::coordinator::getInitialPartitionsLocalFiles(char* pathToCsv, std::ve
         
     }
 
-
     fs.close();
 }
 
@@ -83,4 +84,8 @@ void tools::coordinator::getInitialPartitionsHttp(char* pathToCsv, std::vector<s
     pathToCsv[0] = '\0';
     todoOutput.at(0);
     std::cerr << "not implemented" << std::endl;
+}
+
+std::string tools::coordinator::getResultFilename(int index) {
+   return config::resultFilename + std::to_string(index) + ".csv";
 }

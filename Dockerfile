@@ -7,11 +7,10 @@ ENV CBDP_PORT 4242
 FROM base as coordinator
 
 COPY cmake-build-debug/coordinator .
-CMD exec ./coordinator filelist.csv "$CBDP_PORT"
+CMD exec ./coordinator https://db.in.tum.de/teaching/ws2223/clouddataprocessing/data/filelist.csv "$CBDP_PORT"
 
 FROM base as worker
 
 ENV CBDP_COORDINATOR coordinator
 COPY cmake-build-debug/worker .
 CMD echo "worker $CBDP_COORDINATOR $CBDP_PORT" && exec ./worker "$CBDP_COORDINATOR" "$CBDP_PORT"
-

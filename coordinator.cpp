@@ -32,6 +32,20 @@
  * Example:
  *    ./coordinator http://example.org/filelist.csv 4242 
 */
+
+struct ResultPerFile
+{
+   std::string domain;
+   int count;
+};
+
+void insertDomainCountInRightPlace(std::vector<ResultPerFile>& results, ResultPerFile result) {
+   int index = 0;
+   while ((size_t) index < results.size() && results[(size_t) index++].count > result.count);
+   results.insert(results.begin() + index - 1, result);
+   results.pop_back();
+}
+
 int main(int argc, char* argv[]) {
    if (argc != 3) {
       std::cerr << "Usage: " << argv[0] << " <URL to csv list> <listen port>" << std::endl;
@@ -52,16 +66,37 @@ int main(int argc, char* argv[]) {
 
    auto listener = tools::coordinator::getListenerSocket(argv[2]);
 
-
    PollLoops polling;
    polling.init(listener, initialPartition);
-
    polling.pollLoop();
 
    std::cout << polling.result << std::endl;
-
    polling.closePolling();
 
+   const std::string accountName = config::credentials::accountName;
+   const std::string accountToken = config::credentials::accountToken;
 
+   AzureBlobClient client = AzureBlobClient(accountName, accountToken);
+   
+   std::vector<ResultPerFile> orderedResult;
+   orderedResult.reserve(25);
+
+   std::string domain;
+   int count;
+
+   for (int i = 1; i <= 10; i++)
+   {
+      const std::string filename = tools::coordinator::getResultFilename(i);
+      std::stringstream result = client.downloadStringStream(filename);
+
+      while (result >> domain) {
+         result >> count;
+         ResultPerFile res;
+         res.domain = domain;
+         res.count = count;
+         insertDomainCountInRightPlace(orderedResult, res);
+      }
+   }
+   
    return 0;
 }

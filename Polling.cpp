@@ -22,7 +22,7 @@ void Polling::pollIteration(
                     std::function<CallbackReturn(int)> incomingConnectionCallback, 
                     std::function<CallbackReturn(int, int, std::array<char, 32>)> recvBytes, 
                     std::function<CallbackReturn(int)> workerFailureCallback) {
-    poll(pollFds.data(), pollFds.size(), -1);
+    poll(pollFds.data(), (unsigned int) pollFds.size(), -1);
 
     for (size_t index = 0, limit = pollFds.size(); index != limit; ++index) {
         const auto& pollFd = pollFds[index];
@@ -79,18 +79,14 @@ void Polling::pollIteration(
         } else if(recvReturn == CallbackReturn::BREAK_OUTER_LOOP) {
             return;
         }
-
-
     }
 };
-
 
 void Polling::closePolling() {
     // Cleanup
     for (auto& pollFd : pollFds)
         close(pollFd.fd);
 }
-
 
 void PollLoops::init(int listener, std::vector<std::string> initialPartitions) {
     this->result = 0;
@@ -100,11 +96,7 @@ void PollLoops::init(int listener, std::vector<std::string> initialPartitions) {
     this->initPolling(listener);
 };
 
-
-
 void PollLoops::pollLoop() {
-
-
     auto assignWork = [&](int fd) {
         if (initialPartitions.empty())  
             return CallbackReturn::BREAK_OUTER_LOOP;
@@ -112,7 +104,8 @@ void PollLoops::pollLoop() {
         initialPartitions.pop_back();
 
         const auto& file = distributedWork[fd];
-        if (auto status = send(fd, file.c_str(), file.size(), 0); status == -1) {
+        auto status = send(fd, file.c_str(), file.size(), 0);
+        if (status == -1) {
             perror("send() failed");
             
             initialPartitions.push_back(std::move(distributedWork[fd]));
@@ -128,7 +121,6 @@ void PollLoops::pollLoop() {
         }
         return CallbackReturn::DEFAULT_;
     };
-    
 
     auto recvBytes = [&](int pollFd, int numBytes, std::array<char, 32> buffer) {
         // Parse response
@@ -146,15 +138,11 @@ void PollLoops::pollLoop() {
 
         return assignWork(pollFd);
     };
-
-
     
     while(!initialPartitions.empty() || !distributedWork.empty())
         this->pollIteration(assignWork, recvBytes, workerFailureCallback);
     
 }
-
-
 
 void PollLoops::countLoop() {
 

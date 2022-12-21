@@ -35,9 +35,7 @@ void AzureBlobClient::setContainer(std::string containerName)
 // Create a container that stores all blobs
 {  
    this->containerName = std::move(containerName);
-
 }
-
 
 void AzureBlobClient::test() {
    auto blobs = this->listBlobs();
@@ -53,11 +51,8 @@ void AzureBlobClient::test() {
       auto ou = blobProps.get();
       auto now = ou.response();
       //now.
-   
    }
-
 }
-
 
 void AzureBlobClient::deleteContainer()
 // Delete the container that stored all blobs

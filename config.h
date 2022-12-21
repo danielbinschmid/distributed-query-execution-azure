@@ -7,6 +7,7 @@
 namespace config {
     // Number of aggregates/ range buckets for hash ranging
     static const int nAggregates = 10;
+    static const std::string resultFilename = "result_file";
 
     /**
      * Get your credentials via

@@ -8,15 +8,11 @@ enum CallbackReturn { BREAK_OUTER_LOOP, CONTINUE_INNER_LOOP, DEFAULT_ };
 
 
 class Polling {
-    
     private:
         std::vector<pollfd> pollFds;
         int listener;
-        
             // The class
     protected:             // Access specifier
-
-
         void initPolling(int listener);
 
         /**
@@ -41,17 +37,12 @@ class Polling {
 
 class PollLoops: public Polling {
     private:
-        
         std::unordered_map<int, std::string> distributedWork;
         std::vector<std::string> initialPartitions;
-
 
     public:
         size_t result;
         void init(int listener, std::vector<std::string> initialPartitions);
-
         void pollLoop();
-
-
         void countLoop();
 };
