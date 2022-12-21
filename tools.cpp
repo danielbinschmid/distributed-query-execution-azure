@@ -394,7 +394,9 @@ void tools::worker::storeTop25ToDisk(int subPartitionIdx, SortedOccurencesMap to
 
 void insertIntoOrdered(std::vector<DomainAndCount>& results, DomainAndCount result) {
     int index = 0;
-    while ((size_t) index < results.size() && results[(size_t) index++].count > result.count);
+    while ((size_t) index < results.size() && results[(size_t) index].count > result.count) {
+        index++;
+    }
     SortedOccurencesMap::iterator target = results.begin();
 
   
