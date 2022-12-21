@@ -1,21 +1,20 @@
+#include "AzureBlobClient.h"
 #include "CurlEasyPtr.h"
+#include "config.h"
+#include "tools.h"
 #include <array>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <thread>
 #include <netdb.h>
 #include <sys/socket.h>
-#include <filesystem>
-#include <fstream>
-#include "AzureBlobClient.h"
-#include "config.h"
-#include "tools.h"
 #define N_BYTES_RECEIVED 1024
+#define LOGGING false
 
 namespace fs = std::filesystem;
-
-
 
 size_t processUrl(std::string_view url) {
    using namespace std::literals;
@@ -28,7 +27,6 @@ size_t processUrl(std::string_view url) {
    std::fstream content;
    content.open(filepath);
 
-   
    for (std::string row; std::getline(content, row, '\n');) {
       auto rowStream = std::stringstream(std::move(row));
 
@@ -93,7 +91,6 @@ int main(int argc, char* argv[]) {
    }
    // ------------------------------------------------------------------------------------------
 
-
 breakConnect:
    freeaddrinfo(coordinatorAddr);
    if (status == -1) {
@@ -113,29 +110,35 @@ breakConnect:
       // Get and deserialize incoming task-buffer
       auto taskSerialized = std::string(buffer.data(), static_cast<size_t>(numBytes));
       CountPartitionTask countTask;
-      MergeSortTask mergeSortTask;
+      MergeSortTask mergeSortTask{};
       TaskType tasktype = tools::worker::deserializeTaskBuffer(taskSerialized, countTask, mergeSortTask);
 
       // do task
       auto result = 0;
       OccurencesMap occurrencesMap;
       SortedOccurencesMap top25;
-      switch(tasktype) {
-         case TaskType::COUNT: 
-            std::cout << countTask.url << std::endl;
+      switch (tasktype) {
+         case TaskType::COUNT:
+            if (LOGGING) {
+               std::cout << countTask.url << std::endl;
+            }
             tools::worker::getOccurencesMap(countTask.url, occurrencesMap);
             tools::worker::storeOccurencesMapToDisk(countTask.partitionIdx, occurrencesMap);
             result = 1;
             break;
-         
+
          case TaskType::MERGE_SORT:
-            std::cout << "SubPartition: " << mergeSortTask.subPartitionIdx << std::endl;
+            if (LOGGING) {
+               std::cout << "SubPartition: " << mergeSortTask.subPartitionIdx << std::endl;
+            }
             tools::worker::mergeSort(mergeSortTask.subPartitionIdx, top25);
             tools::worker::storeTop25ToDisk(mergeSortTask.subPartitionIdx, top25);
             result = 1;
             break;
          default:
-            std::cerr << "task type not known to worker" << std::endl; 
+            if (LOGGING) {
+               std::cerr << "task type not known to worker" << std::endl;
+            }
       }
 
       auto response = std::to_string(result);
@@ -148,4 +151,3 @@ breakConnect:
    close(connection);
    return 0;
 }
-
